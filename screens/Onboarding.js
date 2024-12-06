@@ -164,16 +164,17 @@ const styles = StyleSheet.create({
   },
   carouselTitle: {
     fontSize: 24,
-    fontWeight: "bold",
     color: "#333",
     marginBottom: 15,
     textAlign: "center",
+    fontFamily: "Quicksand-Bold",
   },
   carouselDescription: {
     fontSize: 16,
     color: "#666",
     textAlign: "center",
     paddingHorizontal: 20,
+    fontFamily: "Quicksand",
   },
   paginationContainer: {
     flexDirection: "row",
@@ -209,12 +210,12 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "bold",
+   fontFamily:"Quicksand-SemiBold",
   },
   signupButtonText: {
     color: Colors.primary,
     fontSize: 18,
-    fontWeight: "bold",
+   fontFamily:"Quicksand-SemiBold",
   },
 });
 

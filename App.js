@@ -19,6 +19,15 @@ import Config from "./config/Config";
 import OnboardingScreen from "./screens/Onboarding";
 import LoginScreen from "./screens/Login";
 import SignupScreen from "./screens/Signup";
+import BottomNav from "./components/BottomNav";
+import HomeScreen from "./screens/Home";
+import AttendScreen from "./screens/Attend";
+import AttendanceHistoryScreen from "./screens/AttendanceHistory";
+import CreateAttendanceScreen from "./screens/CreateAttendance";
+import BooksListScreen from "./screens/BooksList";
+import AttendanceBookDetailScreen from "./screens/AttendanceBookDetail";
+import EventDetailsScreen from "./screens/EventDetails";
+import ProfileEditScreen from "./screens/ProfileEdit";
 
 const Stack = createNativeStackNavigator();
 
@@ -50,7 +59,7 @@ export default function App() {
         const userToken = await SecureStore.getItemAsync("userToken");
 
         // Set the initial route based on the existence of userToken
-        setInitialRoute(userToken ? "HomeScreen" : "Onboarding");
+        setInitialRoute(userToken ? "BottomNav" : "Onboarding");
 
         // Ensure fonts are loaded before hiding the splash screen
         if (fontsLoaded || fontError) {
@@ -88,6 +97,12 @@ export default function App() {
                 }}
               >
                 <Stack.Screen
+                  name="BottomNav"
+                  component={BottomNav}
+                  options={{ headerShown: false }}
+                />
+
+                <Stack.Screen
                   name="Onboarding"
                   component={OnboardingScreen}
                   options={{ headerShown: false }}
@@ -100,6 +115,41 @@ export default function App() {
                 <Stack.Screen
                   name="Signup"
                   component={SignupScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="Attend"
+                  component={AttendScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="AttendanceHistory"
+                  component={AttendanceHistoryScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="CreateAttendance"
+                  component={CreateAttendanceScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="BooksList"
+                  component={BooksListScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="AttendanceBookDetail"
+                  component={AttendanceBookDetailScreen}
+                  options={{ headerShown: false }}
+                />
+                  <Stack.Screen
+                  name="EventDetails"
+                  component={EventDetailsScreen}
+                  options={{ headerShown: false }}
+                />
+                  <Stack.Screen
+                  name="ProfileEdit"
+                  component={ProfileEditScreen}
                   options={{ headerShown: false }}
                 />
               </Stack.Navigator>

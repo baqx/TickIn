@@ -12,6 +12,9 @@ import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import Config from "../config/Config";
+import { Colors } from "../styles/styles";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
 // Configuration and API endpoints
 const API_BASE_URL = Config.BASE_URL;
@@ -206,9 +209,9 @@ const SignupScreen = ({ navigation }) => {
         phone,
         fullname,
         gender,
-        university: universities.find((u) => u.id === university)?.name || "",
-        faculty: faculties.find((f) => f.id === faculty)?.name || "",
-        department: departments.find((d) => d.id === department)?.name || "",
+        university: universities.find((u) => u.id === university)?.id || "",
+        faculty: faculties.find((f) => f.id === faculty)?.id || "",
+        department: departments.find((d) => d.id === department)?.id || "",
         role,
         level,
         matric_no: matricNo,
@@ -224,7 +227,7 @@ const SignupScreen = ({ navigation }) => {
         );
 
         // Navigate to homepage or dashboard
-        navigation.replace("HomePage");
+        navigation.replace("BottomNav");
       } else {
         // Show error from API
         Alert.alert("Signup Failed", response.data.message);
@@ -240,8 +243,10 @@ const SignupScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
+      <TouchableOpacity onPress={() => navigation.navigate("Onboarding")}>
+        <Ionicons name="chevron-back" size={30} />
+      </TouchableOpacity>   
       <Text style={styles.title}>Create an Account</Text>
-
       {/* Username Input */}
       <TextInput
         style={styles.input}
@@ -249,7 +254,6 @@ const SignupScreen = ({ navigation }) => {
         value={username}
         onChangeText={setUsername}
       />
-
       {/* Email Input */}
       <TextInput
         style={styles.input}
@@ -258,7 +262,6 @@ const SignupScreen = ({ navigation }) => {
         value={email}
         onChangeText={setEmail}
       />
-
       {/* Phone Input */}
       <TextInput
         style={styles.input}
@@ -267,7 +270,6 @@ const SignupScreen = ({ navigation }) => {
         value={phone}
         onChangeText={setPhone}
       />
-
       {/* Full Name Input */}
       <TextInput
         style={styles.input}
@@ -275,7 +277,6 @@ const SignupScreen = ({ navigation }) => {
         value={fullname}
         onChangeText={setFullname}
       />
-
       {/* Gender Picker */}
       <View style={styles.pickerContainer}>
         <Picker
@@ -288,20 +289,18 @@ const SignupScreen = ({ navigation }) => {
           <Picker.Item label="Other" value="other" />
         </Picker>
       </View>
-
       {/* University Picker */}
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={university}
           onValueChange={(itemValue) => setUniversity(itemValue)}
         >
-          <Picker.Item label="Select University" value="" />
+          <Picker.Item label="Select University"  value="" />
           {universities.map((uni) => (
             <Picker.Item key={uni.id} label={uni.name} value={uni.id} />
           ))}
         </Picker>
       </View>
-
       {/* Faculty Picker */}
       <View style={styles.pickerContainer}>
         <Picker
@@ -315,7 +314,6 @@ const SignupScreen = ({ navigation }) => {
           ))}
         </Picker>
       </View>
-
       {/* Department Picker */}
       <View style={styles.pickerContainer}>
         <Picker
@@ -329,7 +327,6 @@ const SignupScreen = ({ navigation }) => {
           ))}
         </Picker>
       </View>
-
       {/* Role Picker */}
       <View style={styles.pickerContainer}>
         <Picker
@@ -340,7 +337,6 @@ const SignupScreen = ({ navigation }) => {
           <Picker.Item label="Admin" value="admin" />
         </Picker>
       </View>
-
       {/* Level Picker */}
       <View style={styles.pickerContainer}>
         <Picker
@@ -356,15 +352,13 @@ const SignupScreen = ({ navigation }) => {
           <Picker.Item label="700 Level" value="700" />
         </Picker>
       </View>
-
       {/* Matric Number Input */}
       <TextInput
         style={styles.input}
-        placeholder="Matric Number"
+        placeholder="Matric Number / Student ID"
         value={matricNo}
         onChangeText={setMatricNo}
       />
-
       {/* Password Input */}
       <TextInput
         style={styles.input}
@@ -373,7 +367,6 @@ const SignupScreen = ({ navigation }) => {
         value={password}
         onChangeText={setPassword}
       />
-
       {/* Confirm Password Input */}
       <TextInput
         style={styles.input}
@@ -382,7 +375,6 @@ const SignupScreen = ({ navigation }) => {
         value={confirmPassword}
         onChangeText={setConfirmPassword}
       />
-
       {/* Signup Button */}
       <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
         <Text style={styles.signupButtonText}>Sign Up</Text>
@@ -395,38 +387,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.background,
   },
   title: {
     fontSize: 24,
-    fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+    fontFamily: "Quicksand-Bold",
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    marginBottom: 15,
-    borderRadius: 5,
-    backgroundColor: "white",
+    height: 50,
+    backgroundColor: Colors.almostBg,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    color: Colors.textPrimary,
+    marginVertical: "10",
+    fontFamily: "Quicksand",
   },
   pickerContainer: {
-    borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 5,
     marginBottom: 15,
-    backgroundColor: "white",
+    backgroundColor: Colors.almostBg,
+    fontFamily: "Quicksand",
   },
   signupButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: Colors.primary,
     padding: 15,
     borderRadius: 5,
     alignItems: "center",
+    marginBottom: 80,
   },
   signupButtonText: {
     color: "white",
-    fontWeight: "bold",
+    fontFamily: "Quicksand-SemiBold",
   },
 });
 

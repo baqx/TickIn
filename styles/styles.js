@@ -13,8 +13,8 @@ export const Colors = {
   // Neutral colors
   background: "#fdfdfd", // A slightly tinted white
   cardBackground: "#ffffff", // White card background
-  almostBg: "#f8f8f8", // A slightly darker neutral gray
-
+  almostBg: "#f2f3f5", // A slightly darker neutral gray
+  white: "#fff",
   // Text colors
   textPrimary: "#2c3e50", // Dark navy
   textSecondary: "#95a5a6", // Cool gray
