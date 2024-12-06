@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  RefreshControl,   
+  RefreshControl,
   Alert,
   TouchableOpacity,
 } from "react-native";
@@ -313,6 +313,7 @@ const styles = StyleSheet.create({
   eventCard: {
     marginBottom: 10,
     borderRadius: 10,
+    backgroundColor: Colors.cardBackground,
   },
   eventCardContent: {
     padding: 15,

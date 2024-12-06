@@ -29,7 +29,7 @@ const NotificationIcons = {
 };
 
 // Mock Notification Data (replace with actual API call)
-const generateMockNotifications = (count) => {
+const generateMockNotifications = (count, page = 1) => {
   const notificationTypes = [
     {
       type: "attendance",
@@ -62,7 +62,7 @@ const generateMockNotifications = (count) => {
   return Array.from({ length: count }, (_, index) => {
     const notification = notificationTypes[index % notificationTypes.length];
     return {
-      id: `notification_${index} `,
+      id: `notification_${page}_${index}`, // Include page number in ID
       ...notification,
       timestamp: new Date(Date.now() - index * 60000).toLocaleString(), // Mock timestamps
       isRead: Math.random() > 0.3, // Randomly mark some as read
@@ -83,8 +83,7 @@ const NotificationsScreen = ({ navigation }) => {
         setLoading(true);
 
         // Simulate API call with mock data
-        // In a real app, replace this with actual API fetch
-        const newNotifications = generateMockNotifications(10);
+        const newNotifications = generateMockNotifications(10, pageNum);
 
         if (isRefresh) {
           setNotifications(newNotifications);
@@ -96,7 +95,6 @@ const NotificationsScreen = ({ navigation }) => {
         setPage(pageNum);
       } catch (error) {
         console.error("Failed to fetch notifications:", error);
-        // Handle error (show error message, etc.)
       } finally {
         setLoading(false);
       }
@@ -134,7 +132,6 @@ const NotificationsScreen = ({ navigation }) => {
           item.isRead && styles.readNotification,
         ]}
         onPress={() => {
-          // Handle notification tap (mark as read, navigate, etc.)
           console.log("Notification tapped:", item);
         }}
       >
@@ -178,7 +175,6 @@ const NotificationsScreen = ({ navigation }) => {
         renderItem={renderNotificationItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        // Pull to Refresh
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -187,10 +183,8 @@ const NotificationsScreen = ({ navigation }) => {
             tintColor={Colors.primary}
           />
         }
-        // Pagination
         onEndReached={loadMoreNotifications}
         onEndReachedThreshold={0.1}
-        // Loading Footer
         ListFooterComponent={() =>
           loading ? (
             <View style={styles.loadingFooter}>
@@ -198,7 +192,6 @@ const NotificationsScreen = ({ navigation }) => {
             </View>
           ) : null
         }
-        // Empty List Handling
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <BellRing size={64} color={Colors.textSecondary} />
@@ -227,7 +220,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     color: Colors.textPrimary,
-    fontFamily: "Quicksand-Bold", // Set font family to Quicksand
+    fontFamily: "Quicksand-Bold",
   },
   listContent: {
     paddingVertical: 8,
@@ -262,25 +255,24 @@ const styles = StyleSheet.create({
   },
   notificationTitle: {
     fontSize: 16,
-
     color: Colors.textPrimary,
     marginBottom: 4,
-    fontFamily: "Quicksand-SemiBold", // Set font family to Quicksand
+    fontFamily: "Quicksand-SemiBold",
   },
   notificationDescription: {
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 4,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
   notificationTimestamp: {
     fontSize: 12,
     color: Colors.grey,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
   readText: {
     color: Colors.textSecondary,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
   loadingFooter: {
     paddingVertical: 16,
@@ -288,7 +280,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: Colors.textSecondary,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
   emptyContainer: {
     flex: 1,
@@ -301,7 +293,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: Colors.textPrimary,
     marginTop: 16,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
   emptySubtitle: {
     fontSize: 14,
@@ -309,7 +301,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
     paddingHorizontal: 32,
-    fontFamily: "Quicksand", // Set font family to Quicksand
+    fontFamily: "Quicksand",
   },
 });
+
 export default NotificationsScreen;

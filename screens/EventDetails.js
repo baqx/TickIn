@@ -384,6 +384,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 10,
     padding: 15,
+    backgroundColor: Colors.cardBackground,
   },
   detailsCardContent: {
     marginBottom: 15,

@@ -53,32 +53,35 @@ const BottomNav = () => {
             onPress={() => setIndex(i)}
           >
             {i === 1 ? (
-             <View
-             style={[
-               styles.attendCircle,
-               index === 1 ? styles.activeCircle : styles.inactiveCircle,
-             ]}
-           >
-             <MaterialCommunityIcons
-               name={index === 1 ? route.icon : route.iconOutline}
-               size={23}
-               color={index === 1 ? 'white' : Colors.textPrimary} // Change color to white if active
-             />
-             <Text
-               style={[
-                 styles.label,
-                 { fontFamily: "Quicksand", color: index === 1 ? 'white' : Colors.textPrimary }, // Change color to white if active
-               ]}
-             >
-               {route.title}
-             </Text>
-           </View>
+              <View
+                style={[
+                  styles.attendCircle,
+                  index === 1 ? styles.activeCircle : styles.inactiveCircle,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={index === 1 ? route.icon : route.iconOutline}
+                  size={23}
+                  color={index === 1 ? "white" : Colors.textPrimary} // Change color to white if active
+                />
+                <Text
+                  style={[
+                    styles.label,
+                    {
+                      fontFamily: "Quicksand",
+                      color: index === 1 ? "white" : Colors.textPrimary,
+                    }, // Change color to white if active
+                  ]}
+                >
+                  {route.title}
+                </Text>
+              </View>
             ) : (
               <>
                 <MaterialCommunityIcons
                   name={index === i ? route.icon : route.iconOutline}
                   size={24}
-                  color={index === i ? Colors.primary : Colors.gray}
+                  color={index === i ? Colors.primary : Colors.textPrimary}
                 />
                 <Text style={[styles.label, { fontFamily: "Quicksand" }]}>
                   {route.title}
@@ -96,7 +99,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     borderRadius: 20,
-    marginBottom: 5,
+    
     backgroundColor: "transparent", // Set the background color to transparent
   },
   navBar: {
@@ -106,7 +109,7 @@ const styles = StyleSheet.create({
     elevation: 4,
     paddingVertical: 10,
     position: "relative",
-    borderRadius: 20,
+
   },
   navItem: {
     alignItems: "center",
@@ -134,6 +137,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
+    color: Colors.textPrimary,
   },
 });
 

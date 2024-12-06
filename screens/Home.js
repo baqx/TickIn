@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableOpacity,
-  Image,
+  ActivityIndicator,
 } from "react-native";
 import { Avatar, Card, Button, Surface, Chip } from "react-native-paper";
 import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
@@ -17,9 +17,12 @@ import {
   Users,
   FileText,
 } from "lucide-react-native";
-import * as Font from "expo-font";
 import moment from "moment";
+import * as SecureStore from "expo-secure-store";
+import axios from "axios";
+
 import { Colors } from "../styles/styles";
+import Config from "../config/Config";
 import { useNavigation } from "@react-navigation/native";
 
 // Color Palette
@@ -33,32 +36,88 @@ const {
   accent,
   success,
 } = Colors;
-const HomeScreen = () => {
-  const navigation = useNavigation();
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [fontsLoaded, setFontsLoaded] = useState(false);
 
-  // Load Quicksand Fonts
+const HomeScreen = ({}) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [userProfile, setUserProfile] = useState(null);
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigation = useNavigation();
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      // Retrieve user token from secure store
+      const userToken = await SecureStore.getItemAsync("userToken");
+
+      if (!userToken) {
+        throw new Error("No user token found");
+      }
+
+      // Fetch user profile
+      const profileResponse = await axios.post(Config.BASE_URL + "/user/user", {
+        user_id: userToken,
+        pass: Config.PASS,
+      });
+
+      // Fetch attendance history
+      const historyResponse = await axios.post(
+        Config.BASE_URL + "/attendance/attendance-history",
+        {
+          user_id: userToken,
+          pass: Config.PASS,
+        }
+      );
+
+      if (profileResponse.data.status === 1) {
+        setUserProfile({
+          name: `${profileResponse.data.data.username}`,
+          university: profileResponse.data.data.university_name,
+          faculty: profileResponse.data.data.faculty_name,
+          department: profileResponse.data.data.department_name,
+          level: `${profileResponse.data.data.level} Level`,
+          avatarUrl: "https://www.pngrepo.com/png/170303/180/avatar.png",
+        });
+      } else {
+        throw new Error(
+          profileResponse.data.message || "Failed to fetch user profile"
+        );
+      }
+
+      if (historyResponse.data.status === 1) {
+        // Sort attendance history and take the most recent 2 entries
+        const sortedHistory = historyResponse.data.data
+          .sort(
+            (a, b) => new Date(b.attendance_time) - new Date(a.attendance_time)
+          )
+          .slice(0, 2);
+
+        setAttendanceHistory(sortedHistory);
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error("Profile fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Time update effect
   useEffect(() => {
+    // Fetch user profile on component mount
+    fetchUserProfile();
+
     // Update time every second
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
   }, []);
 
-  // User Profile Data (Mock Data)
-  const userProfile = {
-    name: "Adegbola Abdulbaqee Oluwatimilehin",
-    university: "Federal University of Agriculture, Abeokuta",
-    faculty: "College of Physical Sciences",
-    department: "Mathematics",
-    level: "100 Level",
-    avatarUrl: "https://www.pngrepo.com/png/170303/180/avatar.png",
-  };
-
-  // Quick Action Buttons
+  // Quick Action Button Component
   const QuickActionButton = ({ icon, title, onPress }) => (
     <TouchableOpacity style={styles.quickActionButton} onPress={onPress}>
       {icon}
@@ -66,16 +125,45 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  // Activity Log Item
-  const ActivityLogItem = ({ icon, title, timestamp }) => (
+  // Activity Log Item Component
+  const ActivityLogItem = ({ icon, title, timestamp, bookTitle }) => (
     <View style={styles.activityLogItem}>
       {icon}
       <View style={styles.activityLogContent}>
         <Text style={styles.activityLogTitle}>{title}</Text>
-        <Text style={styles.activityLogTimestamp}>{timestamp}</Text>
+        <Text style={styles.activityLogSubtitle}>{bookTitle}</Text>
+        <Text style={styles.activityLogTimestamp}>
+          {moment(timestamp).fromNow()}
+        </Text>
       </View>
     </View>
   );
+
+  // Loading Spinner
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={primary} />
+        <Text style={styles.loadingText}>Let it cook...</Text>
+      </View>
+    );
+  }
+
+  // Error Handling
+  if (error || !userProfile) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load profile</Text>
+        <Button
+          mode="contained"
+          onPress={fetchUserProfile}
+          style={styles.retryButton}
+        >
+          Retry
+        </Button>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -137,16 +225,19 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
       <Card style={styles.activityLogCard}>
-        <ActivityLogItem
-          icon={<CheckCircle color={success} size={24} />}
-          title="Attendance Marked - GNS 111"
-          timestamp="2 hours ago"
-        />
-        <ActivityLogItem
-          icon={<CheckCircle color={success} size={24} />}
-          title="Attendance Marked - Physics"
-          timestamp="2 hours ago"
-        />
+        {attendanceHistory.length > 0 ? (
+          attendanceHistory.map((activity, index) => (
+            <ActivityLogItem
+              key={activity.attendance_id}
+              icon={<CheckCircle color={primary} size={24} />}
+              title={`Attendance Marked - ${activity.column_name}`}
+              bookTitle={activity.book_title}
+              timestamp={activity.attendance_time}
+            />
+          ))
+        ) : (
+          <Text style={styles.noActivityText}>No recent activities</Text>
+        )}
       </Card>
 
       {/* Quick Actions */}
@@ -195,16 +286,6 @@ const HomeScreen = () => {
         </Chip>
       </View>
 
-      {/* Attendance Books 
-      <TouchableOpacity onPress={()=>navigation.navigate("BooksList")}>
-        <Card style={styles.fullWidthCard}>
-          <View style={styles.fullWidthCardContent}>
-            <FileText color={textPrimary} size={24} />
-            <Text style={styles.fullWidthCardText}>Attendance Books</Text>
-          </View>
-        </Card>
-      </TouchableOpacity>*/}
-
       {/* Ads Section */}
       <Card style={styles.adsCard}>
         <View style={styles.adsContent}>
@@ -216,6 +297,7 @@ const HomeScreen = () => {
               /* Handle Upgrade */
             }}
             style={styles.adsButton}
+            labelStyle={{ fontFamily: "Quicksand" }}
           >
             Upgrade
           </Button>
@@ -226,6 +308,34 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: white,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: textSecondary,
+    fontFamily: "Quicksand",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: white,
+  },
+  errorText: {
+    color: "red",
+    marginBottom: 20,
+    fontFamily: "Quicksand",
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: primary,
+  },
+
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -238,7 +348,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   welcomeText: {
-    fontFamily: "Quicksand-Regular",
+    fontFamily: "Quicksand",
     fontSize: 16,
     color: textSecondary,
   },
@@ -247,6 +357,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: textPrimary,
   },
+  noActivityText: {
+    textAlign: "center",
+    fontFamily: "Quicksand-Medium",
+    color: textSecondary,
+    padding: 15,
+  },
   avatar: {
     backgroundColor: primaryLight,
   },
@@ -254,6 +370,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 15,
     borderRadius: 10,
+    backgroundColor: Colors.cardBackground,
   },
   dateTimeContainer: {
     flexDirection: "row",
@@ -280,6 +397,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 15,
     borderRadius: 10,
+    backgroundColor: Colors.cardBackground,
   },
   userDetailsContainer: {
     flexDirection: "column",
@@ -313,6 +431,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 10,
     padding: 10,
+    backgroundColor: Colors.cardBackground,
   },
   activityLogItem: {
     flexDirection: "row",
@@ -344,6 +463,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "48%",
     elevation: 3,
+    backgroundColor: Colors.cardBackground,
   },
   quickActionButtonText: {
     fontFamily: "Quicksand-Medium",
@@ -359,6 +479,8 @@ const styles = StyleSheet.create({
     backgroundColor: white,
     elevation: 2,
     fontFamily: "Sandbook",
+    backgroundColor: Colors.cardBackground,
+    color: Colors.textPrimary,
   },
   fullWidthCard: {
     marginBottom: 15,
@@ -368,6 +490,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 15,
+    backgroundColor: Colors.cardBackground,
   },
   fullWidthCardText: {
     fontFamily: "Quicksand-SemiBold",

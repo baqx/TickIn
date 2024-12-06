@@ -3,57 +3,122 @@ import {
   View,
   Text,
   ScrollView,
-  StyleSheet,
   TouchableOpacity,
   Animated,
   RefreshControl,
+  ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { Card, Button } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../styles/styles"; // Assuming you have a Colors file for consistent styling
-import { useFonts } from "expo-font"; // For loading custom fonts
+import * as SecureStore from "expo-secure-store";
+import axios from "axios";
+import { Colors } from "../styles/styles";
+import Config from "../config/Config";
 
-const { primary, textPrimary, textSecondary, white } = Colors;
+const { primary, textPrimary, white, textSecondary } = Colors;
 
 const AttendanceHistoryScreen = ({ navigation }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [fadeAnim] = useState(new Animated.Value(0)); // For fade-in animation
+  const [fadeAnim] = useState(new Animated.Value(0));
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Load custom font
-  const [fontsLoaded] = useFonts({
-    Quicksand: require("../assets/fonts/Quicksand-Regular.ttf"), // Adjust the path as necessary
-  });
+  // API configuration
+  const API_URL = Config.BASE_URL + "/attendance/full-attendance-history";
+  const ADMIN_PASS = Config.PASS; // Consider using environment variables
 
   useEffect(() => {
-    fetchAttendanceRecords();
     // Fade-in animation
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
 
-  const fetchAttendanceRecords = () => {
-    const records = [
-      { id: 1, lecture: "Mathematics", date: "2023-10-01", time: "10:00 AM" },
-      { id: 2, lecture: "Physics", date: "2023-10-02", time: "11:00 AM" },
-      { id: 3, lecture: "Chemistry", date: "2023-10-03", time: "09:00 AM" },
-      { id: 4, lecture: "Biology", date: "2023-10-04", time: "01:00 PM" },
-      { id: 5, lecture: "History", date: "2023-10-05", time: "01:00 PM" },
-    ];
-    setAttendanceRecords(records);
+    // Fetch initial records
+    fetchAttendanceRecords();
+  }, []);
+
+  const fetchAttendanceRecords = async (isRefresh = false) => {
+    try {
+      // Get user token from secure store
+      const userToken = await SecureStore.getItemAsync("userToken");
+
+      if (!userToken) {
+        // Handle case where user token is not found
+        console.error("User token not found");
+        setLoading(false);
+        return;
+      }
+
+      const requestPage = isRefresh ? 1 : page;
+
+      const response = await axios.post(API_URL, {
+        pass: ADMIN_PASS,
+        user_id: userToken,
+        page: requestPage,
+        limit: 10, // Adjust as needed
+      });
+
+      if (response.data.status === 1) {
+        // If refreshing, reset the records
+        const newRecords = isRefresh
+          ? response.data.data
+          : [...attendanceRecords, ...response.data.data];
+
+        setAttendanceRecords(newRecords);
+        setTotalPages(response.data.pagination.total_pages);
+        setHasMore(requestPage < response.data.pagination.total_pages);
+
+        // If it's a refresh, reset to first page
+        if (isRefresh) {
+          setPage(1);
+        }
+      } else {
+        // console.error("Failed to fetch records", response.data.message);
+      }
+    } catch (error) {
+      console.error("Error fetching attendance records", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const onRefresh = () => {
     setRefreshing(true);
-    // Simulate fetching new data
-    setTimeout(() => {
-      fetchAttendanceRecords();
-      setRefreshing(false);
-    }, 2000);
+    fetchAttendanceRecords(true);
   };
+
+  const loadMoreRecords = () => {
+    if (hasMore && !loading) {
+      setPage((prevPage) => prevPage + 1);
+      fetchAttendanceRecords();
+    }
+  };
+
+  const renderRecordCard = (record) => (
+    <Card key={record.attendance_id} style={styles.recordCard}>
+      <View style={styles.recordContent}>
+        <View style={styles.column}>
+          <Ionicons name="book" size={24} color={textPrimary} />
+          <Text style={styles.recordLecture}>{record.book_title}</Text>
+        </View>
+        <View style={styles.column}>
+          <Ionicons name="calendar" size={24} color={textPrimary} />
+          <Text style={styles.recordDate}>{record.attendance_time}</Text>
+        </View>
+        <View style={styles.column}>
+          <Ionicons name="information-circle" size={24} color={textPrimary} />
+          <Text style={styles.recordTime}>{record.column_name}</Text>
+        </View>
+      </View>
+    </Card>
+  );
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
@@ -73,25 +138,22 @@ const AttendanceHistoryScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={loadMoreRecords}
+        onEndReachedThreshold={0.1}
       >
-        {attendanceRecords.map((record) => (
-          <Card key={record.id} style={styles.recordCard}>
-            <View style={styles.recordContent}>
-              <View style={styles.column}>
-                <Ionicons name="book" size={24} color={textPrimary} />
-                <Text style={styles.recordLecture}>{record.lecture}</Text>
-              </View>
-              <View style={styles.column}>
-                <Ionicons name="calendar" size={24} color={textPrimary} />
-                <Text style={styles.recordDate}>{record.date}</Text>
-              </View>
-              <View style={styles.column}>
-                <Ionicons name="time" size={24} color={textPrimary} />
-                <Text style={styles.recordTime}>{record.time}</Text>
-              </View>
-            </View>
-          </Card>
-        ))}
+        {attendanceRecords.map(renderRecordCard)}
+
+        {loading && (
+          <ActivityIndicator
+            size="large"
+            color={primary}
+            style={styles.loadingIndicator}
+          />
+        )}
+
+        {!loading && attendanceRecords.length === 0 && (
+          <Text style={styles.noRecordsText}>No attendance records found</Text>
+        )}
       </ScrollView>
 
       {/* Upgrade Button */}
@@ -176,6 +238,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: white,
     fontFamily: "Quicksand",
+  },
+  loadingIndicator: { marginVertical: 20 },
+  noRecordsText: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#fff",
   },
 });
 

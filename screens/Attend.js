@@ -203,7 +203,7 @@ const AttendScreen = ({ currentTab }) => {
       {/* Attendance Marked Confirmation */}
       {isAttendanceMarked && (
         <View style={styles.attendanceMarkedContainer}>
-          <CheckCircle color={success} size={100} />
+          <CheckCircle color={Colors.primary} size={100} />
           <Text style={styles.attendanceMarkedText}>
             You Have Successfully Marked Your Attendance!
           </Text>
