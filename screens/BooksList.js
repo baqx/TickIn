@@ -1,106 +1,126 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TextInput, 
-  TouchableOpacity, 
-  SafeAreaView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
   RefreshControl,
-  ActivityIndicator 
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ChevronLeft, Search, BookOpen, Calendar } from 'lucide-react-native';
+import { ChevronLeft, Search, BookOpen, Calendar } from "lucide-react-native";
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 import { Colors } from "../styles/styles";
-
-// Mock data - in a real app, this would come from an API or database
-const MOCK_BOOKS = [
-  { 
-    id: '1', 
-    bookName: 'Computer Science Attendance', 
-    description: 'Tracking attendance for CS101 class', 
-    level: '100', 
-    averageScore: 85,
-    totalEvents: 12
-  },
-  { 
-    id: '2', 
-    bookName: 'Mathematics Attendance', 
-    description: 'Tracking attendance for Math201 class', 
-    level: '200', 
-    averageScore: 78,
-    totalEvents: 8
-  },
-  // Add more mock books as needed
-];
+import Config from "../config/Config";
 
 const BooksListScreen = () => {
   const navigation = useNavigation();
-  const [books, setBooks] = useState(MOCK_BOOKS);
-  const [filteredBooks, setFilteredBooks] = useState(MOCK_BOOKS);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [books, setBooks] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const itemsPerPage = 5;
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [userToken, setUserToken] = useState("");
+
+  // Fetch user token from SecureStore
+  const fetchUserToken = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      setUserToken(token || "");
+    } catch (error) {
+      console.error("Failed to fetch user token:", error);
+    }
+  };
+
+  // Fetch books
+  const fetchBooks = async (resetData = false) => {
+    if (loading || !userToken) return;
+
+    setLoading(true);
+
+    try {
+      const response = await axios.post(`${Config.BASE_URL}/book/books`, {
+        pass: Config.PASS,
+        user_id: userToken,
+        search: searchQuery,
+        page: resetData ? 1 : page,
+        per_page: 5,
+        sort_by: "created_at",
+        sort_order: "DESC",
+      });
+      //console.log(response.data);
+      if (response.data.status === 1) {
+        const { data, pagination } = response.data;
+
+        // Reset or append books based on resetData flag
+        setBooks(resetData ? data : (prevBooks) => [...prevBooks, ...data]);
+
+        // Update pagination info
+        setPage(pagination.current_page);
+        setTotalPages(pagination.total_pages);
+        setHasMore(pagination.current_page < pagination.total_pages);
+      } else {
+        setBooks([]);
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error fetching books:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   // Search functionality
-  const handleSearch = (query) => {
+  const handleSearch = useCallback((query) => {
     setSearchQuery(query);
-    const filtered = MOCK_BOOKS.filter(book => 
-      book.bookName.toLowerCase().includes(query.toLowerCase()) ||
-      book.description.toLowerCase().includes(query.toLowerCase()) ||
-      book.level.includes(query)
-    );
-    setFilteredBooks(filtered);
     setPage(1);
-  };
+    fetchBooks(true);
+  }, []);
 
   // Pull to refresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // In a real app, you would fetch fresh data here
-    setTimeout(() => {
-      setBooks(MOCK_BOOKS);
-      setFilteredBooks(MOCK_BOOKS);
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    fetchBooks(true);
+  }, [searchQuery, userToken]);
 
   // Pagination logic
   const loadMoreBooks = () => {
-    if (loading) return;
-    
-    setLoading(true);
-    // Simulating API call with timeout
-    setTimeout(() => {
-      const startIndex = page * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const newBooks = filteredBooks.slice(startIndex, endIndex);
-      
-      if (newBooks.length > 0) {
-        setBooks(prevBooks => [...prevBooks, ...newBooks]);
-        setPage(prevPage => prevPage + 1);
-      }
-      
-      setLoading(false);
-    }, 500);
+    if (loading || !hasMore) return;
+    setPage((prevPage) => prevPage + 1);
+    fetchBooks();
   };
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchUserToken();
+  }, []);
+
+  useEffect(() => {
+    if (userToken) {
+      fetchBooks(true);
+    }
+  }, [userToken]);
 
   // Render book item
   const renderBookItem = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.bookCard}
       onPress={() => {
-         navigation.navigate('AttendanceBookDetail', { bookId: item.id })
+        navigation.navigate("AttendanceBookDetail", { bookId: item.book_id });
       }}
     >
       <View style={styles.bookCardContent}>
         <View style={styles.bookCardHeader}>
           <BookOpen color={Colors.primary} size={24} style={styles.bookIcon} />
           <Text style={styles.bookName} numberOfLines={1}>
-            {item.bookName}
+            {item.book_title}
           </Text>
         </View>
         <View style={styles.bookCardDetails}>
@@ -109,12 +129,16 @@ const BooksListScreen = () => {
             <Text style={styles.detailValue}>{item.level}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Calendar color={Colors.textSecondary} size={16} style={styles.detailIcon} />
-            <Text style={styles.detailValue}>{item.totalEvents} Events</Text>
+            <Calendar
+              color={Colors.textSecondary}
+              size={16}
+              style={styles.detailIcon}
+            />
+            <Text style={styles.detailValue}>{item.total_columns} Columns</Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Avg Score:</Text>
-            <Text style={styles.detailValue}>{item.averageScore}</Text>
+            <Text style={styles.detailValue}>{item.average_score}</Text>
           </View>
         </View>
       </View>
@@ -125,8 +149,8 @@ const BooksListScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <View style={styles.headerContainer}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()} 
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <ChevronLeft color={Colors.textPrimary} size={24} />
@@ -136,7 +160,11 @@ const BooksListScreen = () => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Search color={Colors.textSecondary} size={20} style={styles.searchIcon} />
+        <Search
+          color={Colors.textSecondary}
+          size={20}
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search books..."
@@ -150,7 +178,7 @@ const BooksListScreen = () => {
       <FlatList
         data={books}
         renderItem={renderBookItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.book_id.toString()}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
@@ -162,18 +190,22 @@ const BooksListScreen = () => {
         }
         onEndReached={loadMoreBooks}
         onEndReachedThreshold={0.1}
-        ListFooterComponent={() => (
+        ListFooterComponent={() =>
           loading ? (
-            <ActivityIndicator 
-              size="large" 
-              color={Colors.primary} 
-              style={styles.loadingIndicator} 
+            <ActivityIndicator
+              size="large"
+              color={Colors.primary}
+              style={styles.loadingIndicator}
             />
           ) : null
-        )}
+        }
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No books found</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery
+                ? "No books found matching your search"
+                : "No books found"}
+            </Text>
           </View>
         )}
       />
@@ -187,8 +219,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 15,
     paddingVertical: 10,
     backgroundColor: Colors.background,
@@ -198,13 +230,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textPrimary,
-    fontFamily: 'Quicksand-SemiBold',
+    fontFamily: "Quicksand-SemiBold",
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.almostBg,
     borderRadius: 10,
     marginHorizontal: 15,
@@ -219,7 +251,7 @@ const styles = StyleSheet.create({
     height: 50,
     fontSize: 16,
     color: Colors.textPrimary,
-    fontFamily: 'Quicksand',
+    fontFamily: "Quicksand",
   },
   listContainer: {
     paddingHorizontal: 15,
@@ -239,8 +271,8 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   bookCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   bookIcon: {
@@ -248,28 +280,28 @@ const styles = StyleSheet.create({
   },
   bookName: {
     fontSize: 18,
-    fontFamily: 'Quicksand-SemiBold',
+    fontFamily: "Quicksand-SemiBold",
     color: Colors.textPrimary,
     flex: 1,
   },
   bookCardDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   detailLabel: {
     fontSize: 14,
-    fontFamily: 'Quicksand-Medium',
+    fontFamily: "Quicksand-Medium",
     color: Colors.textSecondary,
     marginRight: 5,
   },
   detailValue: {
     fontSize: 14,
-    fontFamily: 'Quicksand-SemiBold',
+    fontFamily: "Quicksand-SemiBold",
     color: Colors.textPrimary,
   },
   detailIcon: {
@@ -280,13 +312,13 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 50,
   },
   emptyText: {
     fontSize: 16,
-    fontFamily: 'Quicksand-Medium',
+    fontFamily: "Quicksand-Medium",
     color: Colors.textSecondary,
   },
 });

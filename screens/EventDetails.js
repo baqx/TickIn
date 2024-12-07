@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,15 +8,9 @@ import {
   Alert,
   Linking,
   Platform,
+  RefreshControl,
 } from "react-native";
-import {
-  Card,
-  Button,
-  IconButton,
-  DataTable,
-  Dialog,
-  Portal,
-} from "react-native-paper";
+import { Card, Button, IconButton, DataTable } from "react-native-paper";
 import MapView, { Marker } from "react-native-maps";
 import {
   Edit,
@@ -32,9 +26,12 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import moment from "moment";
 import { useNavigation, useRoute } from "@react-navigation/native";
-
+import axios from "axios";
+;
+import * as SecureStore from "expo-secure-store";
 // Import color palette from your styles
 import { Colors } from "../styles/styles";
+import Config from "../config/Config";
 
 const {
   mainThemeColor,
@@ -48,51 +45,92 @@ const {
   background,
 } = Colors;
 
-// Mock Event Details
-const mockEventDetails = {
-  id: "EVT001",
-  name: "Computer Science Intro Lecture",
-  shortCode: "123456",
-  eventType: "physical",
-  location: {
-    name: "Main Lecture Hall A",
-    latitude: 7.2906,
-    longitude: 3.441,
-  },
-  timeCreated: "2024-02-15T10:00:00Z",
-  timeRange: {
-    start: "2024-02-15T10:00:00Z",
-    end: "2024-02-15T12:00:00Z",
-  },
-  attendanceCount: 120,
-  attendanceList: [
-    {
-      id: "ST001",
-      fullName: "Adegbola Abdulbaqee",
-      matricNo: "CSC/2022/001",
-      faculty: "Physical Sciences",
-      department: "Computer Science",
-      timeMarked: "2024-02-15T10:05:23Z",
-    },
-    {
-      id: "ST002",
-      fullName: "John Doe",
-      matricNo: "CSC/2022/002",
-      faculty: "Physical Sciences",
-      department: "Computer Science",
-      timeMarked: "2024-02-15T10:07:45Z",
-    },
-    // More students...
-  ],
-};
+// Configuration for API calls
+const API_BASE_URL = Config.BASE_URL;
+const ADMIN_PASS = Config.PASS; // Consider using a more secure method in production
 
 const EventDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const [eventDetails, setEventDetails] = useState(mockEventDetails);
+  const { bookColumnId } = route.params; // Assuming you pass bookColumnId when navigating
+
+  const [eventDetails, setEventDetails] = useState(null);
+  const [attendanceList, setAttendanceList] = useState([]);
   const [page, setPage] = useState(0);
-  const [dialogVisible, setDialogVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const itemsPerPage = 5;
+
+  // Fetch Event Details
+  const fetchEventDetails = async () => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/book/column-details`, {
+        pass: ADMIN_PASS,
+        user_id: await SecureStore.getItemAsync("userToken"),
+        book_column_id: bookColumnId,
+      });
+
+      if (response.data.status === 1) {
+        setEventDetails(response.data.columnDetails);
+      } else {
+        throw new Error(
+          response.data.message || "Failed to fetch event details"
+        );
+      }
+    } catch (err) {
+      setError(err.message);
+      Alert.alert("Error", err.message);
+    }
+  };
+
+  // Fetch Attendance List
+  const fetchAttendanceList = async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/book/attendance-list`,
+        {
+          pass: ADMIN_PASS,
+          book_column_id: bookColumnId,
+        }
+      );
+
+      if (response.data.status === 1) {
+        setAttendanceList(response.data.attendanceList);
+      } else {
+        //  console.log(response);
+        throw new Error(
+          response.data.message || "Failed to fetch attendance list"
+        );
+      }
+    } catch (err) {
+      setError(err.message);
+      Alert.alert("Error", err.message);
+    }
+  };
+
+  // Combined refresh function
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchEventDetails(), fetchAttendanceList()]);
+    } catch (err) {
+      // Error handling is done in individual fetch functions
+    } finally {
+      setRefreshing(false);
+    }
+  }, [bookColumnId]);
+
+  // Initial data load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await onRefresh();
+      setLoading(false);
+    };
+    loadData();
+  }, [bookColumnId]);
 
   // Delete Event Confirmation
   const handleDeleteEvent = () => {
@@ -109,10 +147,39 @@ const EventDetailsScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              // Actual delete API call here
-              navigation.goBack();
+              // Actual delete API call with Axios
+              const userToken = await SecureStore.getItemAsync("userToken");
+              const response = await axios.post(
+                `${Config.BASE_URL}/book/delete-column`,
+                {
+                  pass: Config.PASS,
+                  user_id: userToken,
+                  book_column_id: bookColumnId,
+                },
+                {
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+
+              console.log("Delete Column Response:", response.data);
+
+              if (response.data.status === 1) {
+                navigation.replace("BookList");
+              } else {
+                throw new Error(
+                  response.data.message || "Failed to delete book"
+                );
+              }
             } catch (error) {
-              Alert.alert("Error", "Failed to delete event");
+              //console.error('Delete Book Error:', error);
+              Alert.alert(
+                "Error",
+                axios.isAxiosError(error)
+                  ? error.response?.data?.message
+                  : "Failed to delete attendance book"
+              );
             }
           },
         },
@@ -128,10 +195,10 @@ const EventDetailsScreen = () => {
 
       // Generate CSV content
       const csvContent = [
-        "Full Name,Matric No,Faculty,Department,Time Marked",
-        ...eventDetails.attendanceList.map(
+        "Name,Matric Number,Attendance Date",
+        ...attendanceList.map(
           (student) =>
-            `${student.fullName},${student.matricNo},${student.faculty},${student.department},${student.timeMarked}`
+            `${student.user_name},${student.matric_number},${student.attendance_date}`
         ),
       ].join("\n");
 
@@ -148,7 +215,9 @@ const EventDetailsScreen = () => {
 
   // Open Location in Maps
   const openLocationInMaps = () => {
-    const { latitude, longitude } = eventDetails.location;
+    if (!eventDetails?.latitude || !eventDetails?.longitude) return;
+
+    const { latitude, longitude } = eventDetails;
     const url = Platform.select({
       ios: `maps:0,0?q=${latitude},${longitude}`,
       android: `geo:0,0?q=${latitude},${longitude}`,
@@ -160,12 +229,17 @@ const EventDetailsScreen = () => {
   const repickLocation = () => {
     // Navigate to location picker screen
     navigation.navigate("LocationPicker", {
-      initialLocation: eventDetails.location,
+      initialLocation: {
+        latitude: eventDetails.latitude,
+        longitude: eventDetails.longitude,
+        name: eventDetails.location_name,
+      },
       onLocationSelect: (newLocation) => {
-        // Update location in backend
+        // Implement location update API call here
+        // Update local state temporarily
         setEventDetails((prev) => ({
           ...prev,
-          location: newLocation,
+          ...newLocation,
         }));
       },
     });
@@ -175,8 +249,40 @@ const EventDetailsScreen = () => {
   const from = page * itemsPerPage;
   const to = (page + 1) * itemsPerPage;
 
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading event details...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error || !eventDetails) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          {error || "Unable to load event details"}
+        </Text>
+        <Button mode="contained" onPress={onRefresh}>
+          Retry
+        </Button>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[primary]}
+        />
+      }
+    >
       {/* Event Details Header */}
       <View style={styles.headerContainer}>
         <View style={styles.headerTextContainer}>
@@ -190,7 +296,9 @@ const EventDetailsScreen = () => {
             <IconButton
               icon={() => <Edit color={primary} size={24} />}
               onPress={() =>
-                navigation.navigate("EditEvent", { eventId: eventDetails.id })
+                navigation.navigate("EditEvent", {
+                  bookColumnId: eventDetails.id,
+                })
               }
             />
             <IconButton
@@ -207,12 +315,12 @@ const EventDetailsScreen = () => {
             <Text
               style={[
                 styles.eventTypeText,
-                eventDetails.eventType === "physical"
+                eventDetails.event_type === "physical"
                   ? styles.physicalEventType
                   : styles.onlineEventType,
               ]}
             >
-              {eventDetails.eventType.toUpperCase()}
+              {eventDetails.event_type.toUpperCase()}
             </Text>
           </View>
         </View>
@@ -224,32 +332,29 @@ const EventDetailsScreen = () => {
           <View style={styles.detailItem}>
             <Clock color={textSecondary} size={20} />
             <Text style={styles.detailLabel}>
-              {moment(eventDetails.timeRange.start).format("MMMM D, YYYY")}
+              {moment(eventDetails.date).format("MMMM D, YYYY")}
             </Text>
           </View>
           <View style={styles.detailItem}>
             <Calendar color={textSecondary} size={20} />
-            <Text style={styles.detailLabel}>
-              {moment(eventDetails.timeRange.start).format("h:mm A")} -
-              {moment(eventDetails.timeRange.end).format("h:mm A")}
-            </Text>
+            <Text style={styles.detailLabel}>{eventDetails.time_range}</Text>
           </View>
           <View style={styles.detailItem}>
             <Users color={textSecondary} size={20} />
             <Text style={styles.detailLabel}>
-              {eventDetails.attendanceCount} Attendees
+              {eventDetails.attendance_count} Attendees
             </Text>
           </View>
           <View style={styles.detailItem}>
             <MapPin color={textSecondary} size={20} />
-            <Text style={styles.detailLabel}>{eventDetails.location.name}</Text>
+            <Text style={styles.detailLabel}>{eventDetails.location}</Text>
           </View>
         </View>
 
         {/* Short Code */}
         <View style={styles.shortCodeContainer}>
           <Text style={styles.shortCodeLabel}>Event Short Code</Text>
-          <Text style={styles.shortCodeText}>{eventDetails.shortCode}</Text>
+          <Text style={styles.shortCodeText}>{eventDetails.shortcode}</Text>
         </View>
       </Card>
 
@@ -258,18 +363,18 @@ const EventDetailsScreen = () => {
         <MapView
           style={styles.map}
           initialRegion={{
-            latitude: eventDetails.location.latitude,
-            longitude: eventDetails.location.longitude,
+            latitude: parseFloat(eventDetails.latitude),
+            longitude: parseFloat(eventDetails.longitude),
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
         >
           <Marker
             coordinate={{
-              latitude: eventDetails.location.latitude,
-              longitude: eventDetails.location.longitude,
+              latitude: parseFloat(eventDetails.latitude),
+              longitude: parseFloat(eventDetails.longitude),
             }}
-            title={eventDetails.location.name}
+            title={eventDetails.location_name}
           />
         </MapView>
         <View style={styles.mapActions}>
@@ -311,23 +416,21 @@ const EventDetailsScreen = () => {
             <DataTable.Title>Time Marked</DataTable.Title>
           </DataTable.Header>
 
-          {eventDetails.attendanceList.slice(from, to).map((student) => (
-            <DataTable.Row key={student.id}>
-              <DataTable.Cell>{student.fullName}</DataTable.Cell>
-              <DataTable.Cell>{student.matricNo}</DataTable.Cell>
+          {attendanceList.slice(from, to).map((student, index) => (
+            <DataTable.Row key={index}>
+              <DataTable.Cell>{student.user_name}</DataTable.Cell>
+              <DataTable.Cell>{student.matric_number}</DataTable.Cell>
               <DataTable.Cell>
-                {moment(student.timeMarked).format("h:mm A, MMM D")}
+                {moment(student.attendance_date).format("h:mm A, MMM D")}
               </DataTable.Cell>
             </DataTable.Row>
           ))}
 
           <DataTable.Pagination
             page={page}
-            numberOfPages={Math.ceil(
-              eventDetails.attendanceList.length / itemsPerPage
-            )}
+            numberOfPages={Math.ceil(attendanceList.length / itemsPerPage)}
             onPageChange={(page) => setPage(page)}
-            label={`${from + 1}-${to} of ${eventDetails.attendanceList.length}`}
+            label={`${from + 1}-${to} of ${attendanceList.length}`}
           />
         </DataTable>
       </Card>

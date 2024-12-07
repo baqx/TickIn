@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   SafeAreaView,
+  Alert,
 } from "react-native";
 import {
   BellRing,
@@ -16,7 +17,10 @@ import {
   Calendar,
   MessageCircle,
 } from "lucide-react-native";
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 import { Colors } from "../styles/styles";
+import Config from "../config/Config";
 
 // Notification Type Icons
 const NotificationIcons = {
@@ -28,79 +32,106 @@ const NotificationIcons = {
   default: BellRing,
 };
 
-// Mock Notification Data (replace with actual API call)
-const generateMockNotifications = (count, page = 1) => {
-  const notificationTypes = [
-    {
-      type: "attendance",
-      title: "Attendance Marked",
-      description: "You were marked present for CSC 301 lecture",
-    },
-    {
-      type: "success",
-      title: "Assignment Submitted",
-      description:
-        "Your assignment for Mathematics has been submitted successfully",
-    },
-    {
-      type: "alert",
-      title: "Upcoming Deadline",
-      description: "Research paper submission due in 3 days",
-    },
-    {
-      type: "message",
-      title: "New Message",
-      description: "You have a new message from your project group",
-    },
-    {
-      type: "academic",
-      title: "Grade Update",
-      description: "Your midterm exam results are now available",
-    },
-  ];
-
-  return Array.from({ length: count }, (_, index) => {
-    const notification = notificationTypes[index % notificationTypes.length];
-    return {
-      id: `notification_${page}_${index}`, // Include page number in ID
-      ...notification,
-      timestamp: new Date(Date.now() - index * 60000).toLocaleString(), // Mock timestamps
-      isRead: Math.random() > 0.3, // Randomly mark some as read
-    };
-  });
-};
-
 const NotificationsScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchUserToken = async () => {
+    try {
+      return await SecureStore.getItemAsync("userToken");
+    } catch (error) {
+      console.error("Error fetching user token:", error);
+      Alert.alert("Error", "Unable to fetch user token.");
+      return null;
+    }
+  };
 
   // Fetch notifications with pagination
   const fetchNotifications = useCallback(
     async (pageNum = 1, isRefresh = false) => {
+      if (loading) return; // Prevent multiple simultaneous requests
+
       try {
         setLoading(true);
 
-        // Simulate API call with mock data
-        const newNotifications = generateMockNotifications(10, pageNum);
+        const userToken = await fetchUserToken();
+        if (!userToken) return;
 
-        if (isRefresh) {
-          setNotifications(newNotifications);
-          setRefreshing(false);
+        const response = await axios.post(
+          `${Config.BASE_URL}/user/notifications`,
+          {
+            pass: Config.PASS, // Replace with actual admin pass
+            user_id: userToken,
+            page: pageNum,
+            per_page: 10,
+          }
+        );
+
+        if (response.data.status === 1) {
+          const newNotifications = response.data.notifications.map(
+            (notification) => ({
+              id: notification.id,
+              title: notification.title,
+              description: notification.description,
+              timestamp: new Date(notification.timestamp).toLocaleString(),
+              type: notification.type,
+              isRead: notification.is_read,
+            })
+          );
+
+          if (isRefresh) {
+            setNotifications(newNotifications);
+          } else {
+            setNotifications((prev) => [...prev, ...newNotifications]);
+          }
+
+          setPage(pageNum);
+          setTotalPages(response.data.total_pages);
+          setHasMore(pageNum < response.data.total_pages);
         } else {
-          setNotifications((prev) => [...prev, ...newNotifications]);
+          if (pageNum === 1) setNotifications([]); // No notifications
+          //   if (response.data.message) Alert.alert("Notifications", response.data.message);
         }
-
-        setPage(pageNum);
       } catch (error) {
         console.error("Failed to fetch notifications:", error);
+        Alert.alert("Error", "Failed to load notifications. Please try again.");
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     },
-    []
+    [loading]
   );
+
+  // Mark all notifications as seen
+  const markAllAsSeen = useCallback(async () => {
+    try {
+      const userToken = await fetchUserToken();
+      if (!userToken) return;
+
+      const response = await axios.post(`${Config.BASE_URL}/user/mark-read`, {
+        pass: Config.PASS,
+        user_id: userToken,
+      });
+
+      if (response.data.status === 1) {
+        setNotifications((prev) =>
+          prev.map((notification) => ({ ...notification, isRead: true }))
+        );
+      } else {
+        console.error(
+          "Failed to mark notifications as seen:",
+          response.data.message
+        );
+      }
+    } catch (error) {
+      console.error("Error marking notifications as seen:", error);
+    }
+  }, []);
 
   // Pull to refresh handler
   const onRefresh = useCallback(() => {
@@ -110,15 +141,19 @@ const NotificationsScreen = ({ navigation }) => {
 
   // Pagination loader
   const loadMoreNotifications = useCallback(() => {
-    if (!loading) {
+    if (hasMore && !loading) {
       fetchNotifications(page + 1);
     }
-  }, [fetchNotifications, page, loading]);
+  }, [fetchNotifications, page, hasMore, loading]);
 
-  // Initial load
+  // Initial load and mark notifications as seen
   useEffect(() => {
-    fetchNotifications(1);
-  }, []);
+    const loadInitialData = async () => {
+      await fetchNotifications(1);
+      await markAllAsSeen();
+    };
+    loadInitialData();
+  }, [fetchNotifications, markAllAsSeen]);
 
   // Render individual notification item
   const renderNotificationItem = ({ item }) => {
@@ -184,7 +219,7 @@ const NotificationsScreen = ({ navigation }) => {
           />
         }
         onEndReached={loadMoreNotifications}
-        onEndReachedThreshold={0.1}
+        onEndReachedThreshold={0.2}
         ListFooterComponent={() =>
           loading ? (
             <View style={styles.loadingFooter}>
@@ -205,47 +240,50 @@ const NotificationsScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#f5f5f5",
   },
   headerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.almostBg,
+    borderBottomColor: "#e0e0e0",
   },
   headerTitle: {
-    fontSize: 24,
-    color: Colors.textPrimary,
+    fontSize: 22,
     fontFamily: "Quicksand-Bold",
   },
   listContent: {
-    paddingVertical: 8,
+    paddingHorizontal: 15,
+    paddingTop: 10,
   },
   notificationItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.cardBackground,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.almostBg,
+    backgroundColor: "white",
+    marginBottom: 10,
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   readNotification: {
-    backgroundColor: Colors.almostBg,
+    backgroundColor: "#f5f5f5",
   },
   notificationIconContainer: {
-    marginRight: 12,
+    marginRight: 15,
     position: "relative",
   },
   unreadDot: {
     position: "absolute",
     top: -3,
     right: -3,
-    backgroundColor: Colors.error,
+    backgroundColor: Colors.primary,
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -255,25 +293,47 @@ const styles = StyleSheet.create({
   },
   notificationTitle: {
     fontSize: 16,
-    color: Colors.textPrimary,
-    marginBottom: 4,
     fontFamily: "Quicksand-SemiBold",
+    marginBottom: 5,
   },
   notificationDescription: {
     fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 4,
-    fontFamily: "Quicksand",
-  },
-  notificationTimestamp: {
-    fontSize: 12,
-    color: Colors.grey,
+    color: "#666",
+    marginBottom: 5,
     fontFamily: "Quicksand",
   },
   readText: {
-    color: Colors.textSecondary,
-    fontFamily: "Quicksand",
+    color: "#999",
   },
+  notificationTimestamp: {
+    fontSize: 12,
+    color: "#999",
+  },
+  loadingFooter: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#666",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 50,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 15,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 5,
+  },
+
   loadingFooter: {
     paddingVertical: 16,
     alignItems: "center",
@@ -290,10 +350,9 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     color: Colors.textPrimary,
     marginTop: 16,
-    fontFamily: "Quicksand",
+    fontFamily: "Quicksand-SemiBold",
   },
   emptySubtitle: {
     fontSize: 14,

@@ -163,6 +163,7 @@ const AttendanceHistoryScreen = ({ navigation }) => {
           /* Handle Upgrade */
         }}
         style={styles.upgradeButton}
+        labelStyle={{ fontFamily: "Quicksand-SemiBold" }}
       >
         Upgrade to Premium
       </Button>
@@ -244,6 +245,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     color: "#fff",
+    fontFamily: "Quicksand-SemiBold",
   },
 });
 

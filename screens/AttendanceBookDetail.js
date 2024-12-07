@@ -16,15 +16,16 @@ import {
   Trash2,
   Download,
   PlusCircle,
-  CheckCircle,
   ChevronLeft,
 } from "lucide-react-native";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
+import * as SecureStore from "expo-secure-store";
+import axios from "axios"; // Import Axios
 
 // Import color palette from your styles
 import { Colors } from "../styles/styles";
-import { Ionicons } from "@expo/vector-icons";
+import Config from "../config/Config";
 
 const {
   mainThemeColor,
@@ -38,54 +39,104 @@ const {
   background,
 } = Colors;
 
-// Mock data - replace with actual API calls
-const mockBookDetails = {
-  id: "AB001",
-  name: "Computer Science 101 Attendance",
-  totalStudents: 150,
-  events: [
-    {
-      id: "EVT001",
-      name: "Lecture 1",
-      shortCode: "123456",
-      type: "physical",
-      attendanceCount: 120,
-    },
-    {
-      id: "EVT002",
-      name: "Online Tutorial",
-      shortCode: "789012",
-      type: "online",
-      attendanceCount: 95,
-    },
-    // More events...
-  ],
-};
-
 const AttendanceBookDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const [bookDetails, setBookDetails] = useState(mockBookDetails);
+
+  const [bookDetails, setBookDetails] = useState(null);
+  const [events, setEvents] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [events, setEvents] = useState(mockBookDetails.events);
   const [page, setPage] = useState(1);
-  const itemsPerPage = 5; // Pagination threshold
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Fetch book details (simulated)
-  const fetchBookDetails = async () => {
-    setRefreshing(true);
+  // Fetch book details and events
+  const fetchBookDetails = async (resetPage = false) => {
     try {
-      // Simulate API call
-      // const response = await fetchBookDetailsFromAPI(route.params.bookId);
-      // setBookDetails(response);
+      // Get user token from secure store
+      const userToken = await SecureStore.getItemAsync("userToken");
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Determine page to fetch
+      const currentPage = resetPage ? 1 : page;
+
+      // Show loading indicator
+      if (!resetPage) setLoading(true);
+      setRefreshing(resetPage);
+
+      // Prepare request body
+      const requestBody = {
+        pass: Config.PASS, // Replace with actual admin pass
+        user_id: userToken,
+        book_id: route.params.bookId,
+        page: currentPage,
+      };
+
+      // Make API call using Axios
+      const response = await axios.post(
+        `${Config.BASE_URL}/book/book-details`, 
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('API Response:', response.data);
+
+      // Check response status
+      if (response.data.status === 1) {
+        // Update book details
+        setBookDetails(response.data.bookDetails);
+
+        // Update events (reset or append)
+        setEvents((prevEvents) =>
+          currentPage === 1 
+            ? response.data.events 
+            : [...prevEvents, ...response.data.events]
+        );
+
+        // Update pagination
+        setHasMore(response.data.pagination.hasMore);
+        setPage(currentPage);
+      } else {
+        // Handle API-level error
+        console.error('API Error:', response.data.message);
+        Alert.alert(
+          "Error", 
+          response.data.message || "Failed to fetch book details"
+        );
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to refresh book details");
+      // Handle network or other errors
+      if (axios.isAxiosError(error)) {
+        // Axios-specific error handling
+        console.error('Axios Error:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
+
+        Alert.alert(
+          "Network Error", 
+          error.response?.data?.message || 
+          "Failed to fetch book details. Please check your connection."
+        );
+      } else {
+        // Handle other types of errors
+        console.error('Unexpected Error:', error);
+        Alert.alert("Error", "An unexpected error occurred");
+      }
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
     }
-    setRefreshing(false);
   };
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchBookDetails(true);
+  }, [route.params.bookId]);
 
   // Download Excel functionality
   const downloadExcel = async () => {
@@ -102,12 +153,13 @@ const AttendanceBookDetailScreen = () => {
         await Sharing.shareAsync(fileUri);
       }
     } catch (error) {
+      console.error('Download Excel Error:', error);
       Alert.alert("Error", "Failed to download Excel");
     }
   };
 
   // Delete Book Confirmation
-  const handleDeleteBook = () => {
+  const handleDeleteBook = async () => {
     Alert.alert(
       "Delete Attendance Book",
       "Are you sure you want to delete this attendance book? This action cannot be undone.",
@@ -121,10 +173,37 @@ const AttendanceBookDetailScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              // Actual delete API call here
-              navigation.goBack();
+              // Actual delete API call with Axios
+              const userToken = await SecureStore.getItemAsync("userToken");
+              const response = await axios.post(
+                `${Config.BASE_URL}/book/delete-book`,
+                {
+                  pass: Config.PASS,
+                  user_id: userToken,
+                  book_id: bookDetails.book_id
+                },
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+
+              console.log('Delete Book Response:', response.data);
+
+              if (response.data.status === 1) {
+                navigation.replace("BottomNav");
+              } else {
+                throw new Error(response.data.message || "Failed to delete book");
+              }
             } catch (error) {
-              Alert.alert("Error", "Failed to delete attendance book");
+              //console.error('Delete Book Error:', error);
+              Alert.alert(
+                "Error", 
+                axios.isAxiosError(error) 
+                  ? error.response?.data?.message 
+                  : "Failed to delete attendance book"
+              );
             }
           },
         },
@@ -134,7 +213,9 @@ const AttendanceBookDetailScreen = () => {
 
   // Render Event Item
   const renderEventItem = ({ item }) => (
-    <TouchableOpacity onPress={() => navigation.navigate("EventDetails")}>
+    <TouchableOpacity
+      onPress={() => navigation.navigate("EventDetails", { bookColumnId: item.id })}
+    >
       <Card style={styles.eventCard}>
         <View style={styles.eventCardContent}>
           <View style={styles.eventCardHeader}>
@@ -155,12 +236,12 @@ const AttendanceBookDetailScreen = () => {
           <View style={styles.eventCardDetails}>
             <View style={styles.eventDetailItem}>
               <Text style={styles.eventDetailLabel}>Short Code:</Text>
-              <Text style={styles.eventDetailValue}>{item.shortCode}</Text>
+              <Text style={styles.eventDetailValue}>{item.short_code}</Text>
             </View>
             <View style={styles.eventDetailItem}>
               <Text style={styles.eventDetailLabel}>Attendances:</Text>
               <Text style={styles.eventDetailValue}>
-                {item.attendanceCount}
+                {item.attendance_count}
               </Text>
             </View>
           </View>
@@ -169,15 +250,22 @@ const AttendanceBookDetailScreen = () => {
     </TouchableOpacity>
   );
 
-  // Pagination Logic
-  const paginatedEvents = events.slice(0, page * itemsPerPage);
-
   // Load More Events
   const loadMoreEvents = () => {
-    if (page * itemsPerPage < events.length) {
-      setPage(page + 1);
+    if (hasMore && !loading) {
+      setPage((prevPage) => prevPage + 1);
+      fetchBookDetails();
     }
   };
+
+  // If book details are not loaded yet
+  if (!bookDetails) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading book details...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -193,7 +281,7 @@ const AttendanceBookDetailScreen = () => {
         <View style={styles.headerTextContainer}>
           <Text style={styles.bookNameText}>{bookDetails.name}</Text>
           <Text style={styles.bookDetailsText}>
-            Total Students: {bookDetails.totalStudents}
+            Total Students: {bookDetails.total_students}
           </Text>
         </View>
         <View style={styles.headerActionsContainer}>
@@ -201,7 +289,7 @@ const AttendanceBookDetailScreen = () => {
             icon={() => <Edit color={primary} size={24} />}
             onPress={() =>
               navigation.navigate("EditAttendanceBook", {
-                bookId: bookDetails.id,
+                bookId: bookDetails.book_id,
               })
             }
           />
@@ -217,7 +305,7 @@ const AttendanceBookDetailScreen = () => {
         <Button
           mode="contained"
           onPress={() =>
-            navigation.navigate("CreateEvent", { bookId: bookDetails.id })
+            navigation.navigate("CreateEvent", { bookId: bookDetails.book_id })
           }
           style={styles.actionButton}
           icon={() => <PlusCircle color={white} size={20} />}
@@ -236,14 +324,14 @@ const AttendanceBookDetailScreen = () => {
 
       {/* Events List */}
       <FlatList
-        data={paginatedEvents}
+        data={events}
         renderItem={renderEventItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.eventsList}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={fetchBookDetails}
+            onRefresh={() => fetchBookDetails(true)}
             colors={[primary]}
             tintColor={primary}
           />
@@ -251,7 +339,7 @@ const AttendanceBookDetailScreen = () => {
         onEndReached={loadMoreEvents}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
-          page * itemsPerPage < events.length ? (
+          loading ? (
             <View style={styles.loadMoreContainer}>
               <Text style={styles.loadMoreText}>Loading more events...</Text>
             </View>
@@ -269,6 +357,12 @@ const AttendanceBookDetailScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   container: {
     flex: 1,
     backgroundColor: background,
