@@ -21,6 +21,7 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { Colors } from "../styles/styles";
 import Config from "../config/Config";
+import { useNavigation } from "@react-navigation/native";
 
 // Notification Type Icons
 const NotificationIcons = {
@@ -32,13 +33,13 @@ const NotificationIcons = {
   default: BellRing,
 };
 
-const NotificationsScreen = ({ navigation }) => {
+const NotificationsScreen = ({}) => {
+  const navigation = useNavigation();
   const [notifications, setNotifications] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
 
   const fetchUserToken = async () => {
     try {
@@ -84,17 +85,27 @@ const NotificationsScreen = ({ navigation }) => {
           );
 
           if (isRefresh) {
+            // When refreshing, replace entire list
             setNotifications(newNotifications);
           } else {
-            setNotifications((prev) => [...prev, ...newNotifications]);
+            // When loading more, append unique notifications
+            setNotifications((prev) => {
+              // Create a set of existing notification IDs to prevent duplicates
+              const existingIds = new Set(prev.map((n) => n.id));
+              const uniqueNewNotifications = newNotifications.filter(
+                (notification) => !existingIds.has(notification.id)
+              );
+              return [...prev, ...uniqueNewNotifications];
+            });
           }
 
           setPage(pageNum);
           setTotalPages(response.data.total_pages);
-          setHasMore(pageNum < response.data.total_pages);
+
+          // After notifications are loaded, mark as seen after a delay
+          setTimeout(markAllAsSeen, 3000);
         } else {
           if (pageNum === 1) setNotifications([]); // No notifications
-          //   if (response.data.message) Alert.alert("Notifications", response.data.message);
         }
       } catch (error) {
         console.error("Failed to fetch notifications:", error);
@@ -141,19 +152,18 @@ const NotificationsScreen = ({ navigation }) => {
 
   // Pagination loader
   const loadMoreNotifications = useCallback(() => {
-    if (hasMore && !loading) {
+    // Check if we can load more pages and are not already loading
+    if (page < totalPages && !loading) {
       fetchNotifications(page + 1);
     }
-  }, [fetchNotifications, page, hasMore, loading]);
+  }, [fetchNotifications, page, totalPages, loading]);
 
-  // Initial load and mark notifications as seen
   useEffect(() => {
     const loadInitialData = async () => {
       await fetchNotifications(1);
-      await markAllAsSeen();
     };
     loadInitialData();
-  }, [fetchNotifications, markAllAsSeen]);
+  }, [fetchNotifications]);
 
   // Render individual notification item
   const renderNotificationItem = ({ item }) => {
@@ -219,11 +229,11 @@ const NotificationsScreen = ({ navigation }) => {
           />
         }
         onEndReached={loadMoreNotifications}
-        onEndReachedThreshold={0.2}
+        onEndReachedThreshold={0.5}
         ListFooterComponent={() =>
           loading ? (
             <View style={styles.loadingFooter}>
-              <Text style={styles.loadingText}>Loading more...</Text>
+              <Text style={styles.loadingText}></Text>
             </View>
           ) : null
         }
@@ -240,6 +250,7 @@ const NotificationsScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -333,7 +344,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 5,
   },
-
   loadingFooter: {
     paddingVertical: 16,
     alignItems: "center",

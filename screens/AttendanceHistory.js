@@ -156,17 +156,15 @@ const AttendanceHistoryScreen = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* Upgrade Button */}
+      {/* Upgrade Button
       <Button
         mode="elevated"
-        onPress={() => {
-          /* Handle Upgrade */
-        }}
+        onPress={() => {}}
         style={styles.upgradeButton}
         labelStyle={{ fontFamily: "Quicksand-SemiBold" }}
       >
         Upgrade to Premium
-      </Button>
+      </Button> */}
     </Animated.View>
   );
 };

@@ -17,7 +17,7 @@ const BottomNav = () => {
     },
     {
       key: "mark-attendance",
-      title: "Attend",
+      title: "Mark",
       icon: "clipboard-check",
       iconOutline: "clipboard-check-outline", // Outlined version
     },

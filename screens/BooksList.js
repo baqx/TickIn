@@ -155,16 +155,16 @@ const BooksListScreen = () => {
         >
           <ChevronLeft color={Colors.textPrimary} size={24} />
         </TouchableOpacity>
-        <Text style={styles.title}>Attendance Books</Text>
+        <Text style={styles.title}>My Attendance Books</Text>
       </View>
 
-      {/* Search Bar */}
+      {/* Search Bar
       <View style={styles.searchContainer}>
-        <Search
+      <Search
           color={Colors.textSecondary}
           size={20}
           style={styles.searchIcon}
-        />
+        /> 
         <TextInput
           style={styles.searchInput}
           placeholder="Search books..."
@@ -173,7 +173,7 @@ const BooksListScreen = () => {
           onChangeText={handleSearch}
         />
       </View>
-
+ */}
       {/* Books List */}
       <FlatList
         data={books}

@@ -6,16 +6,17 @@ import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import NetInfo from "@react-native-community/netinfo";
-import NoInternetModal from "./components/NoInternetModal";
-import axios from "axios";
+import * as Location from 'expo-location';
 import * as SecureStore from "expo-secure-store";
+
+// Import custom components and modals
+import { NoInternetModal, LocationPermissionModal } from "./components/InternetLocationModals";
 
 // Import screens
 import { Colors } from "./styles/styles";
 
 //Import Configs
 import { TickInContexts } from "./Contexts/TickInContexts";
-import Config from "./config/Config";
 import OnboardingScreen from "./screens/Onboarding";
 import LoginScreen from "./screens/Login";
 import SignupScreen from "./screens/Signup";
@@ -28,6 +29,8 @@ import BooksListScreen from "./screens/BooksList";
 import AttendanceBookDetailScreen from "./screens/AttendanceBookDetail";
 import EventDetailsScreen from "./screens/EventDetails";
 import ProfileEditScreen from "./screens/ProfileEdit";
+import CreateEventScreen from "./screens/CreateEvent";
+import SubscriptionsScreen from "./screens/SubscriptionsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -35,7 +38,7 @@ export default function App() {
   const [btmcolor, setbtmcolor] = useState("#000");
   const [btmbgcolor, setbtmbgcolor] = useState("#000");
   const [isConnected, setIsConnected] = useState(true);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [locationStatus, setLocationStatus] = useState(null);
   const [initialRoute, setInitialRoute] = useState(null);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -45,6 +48,52 @@ export default function App() {
     "Quicksand-SemiBold": require("./assets/fonts/Quicksand-SemiBold.ttf"),
     "Quicksand-Medium": require("./assets/fonts/Quicksand-Medium.ttf"),
   });
+
+  // Check internet connection
+  useEffect(() => {
+    const unsubscribeNetInfo = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => {
+      unsubscribeNetInfo();
+    };
+  }, []);
+
+  // Check location status
+  useEffect(() => {
+    const checkLocationStatus = async () => {
+      try {
+        // Check if location services are enabled
+        let enabled = await Location.hasServicesEnabledAsync();
+        if (!enabled) {
+          setLocationStatus('disabled');
+          return;
+        }
+
+        // Check permission status
+        let { status } = await Location.getForegroundPermissionsAsync();
+        
+        if (status !== 'granted') {
+          setLocationStatus('not-granted');
+        } else {
+          setLocationStatus('granted');
+        }
+      } catch (error) {
+        console.error('Location permission check error:', error);
+        setLocationStatus('error');
+      }
+    };
+
+    checkLocationStatus();
+
+    // Set up a listener to check location status changes in real-time
+    const locationInterval = setInterval(checkLocationStatus, 5000);
+
+    return () => {
+      clearInterval(locationInterval);
+    };
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
@@ -142,21 +191,34 @@ export default function App() {
                   component={AttendanceBookDetailScreen}
                   options={{ headerShown: false }}
                 />
-                  <Stack.Screen
+                <Stack.Screen
                   name="EventDetails"
                   component={EventDetailsScreen}
                   options={{ headerShown: false }}
                 />
-                  <Stack.Screen
+                <Stack.Screen
+                  name="CreateEvent"
+                  component={CreateEventScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
                   name="ProfileEdit"
                   component={ProfileEditScreen}
+                  options={{ headerShown: false }}
+                />
+                  <Stack.Screen
+                  name="Subscriptions"
+                  component={SubscriptionsScreen}
                   options={{ headerShown: false }}
                 />
               </Stack.Navigator>
             )}
           </NavigationContainer>
         </PaperProvider>
-        {!isConnected && <NoInternetModal />}
+        
+        {/* Internet and Location Modals */}
+        <NoInternetModal />
+        <LocationPermissionModal />
       </View>
     </TickInContexts.Provider>
   );

@@ -10,7 +10,13 @@ import {
   Platform,
   RefreshControl,
 } from "react-native";
-import { Card, Button, IconButton, DataTable } from "react-native-paper";
+import {
+  Card,
+  Button,
+  IconButton,
+  DataTable,
+  ActivityIndicator,
+} from "react-native-paper";
 import MapView, { Marker } from "react-native-maps";
 import {
   Edit,
@@ -27,7 +33,6 @@ import * as Sharing from "expo-sharing";
 import moment from "moment";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import axios from "axios";
-;
 import * as SecureStore from "expo-secure-store";
 // Import color palette from your styles
 import { Colors } from "../styles/styles";
@@ -105,8 +110,8 @@ const EventDetailsScreen = () => {
         );
       }
     } catch (err) {
-      setError(err.message);
-      Alert.alert("Error", err.message);
+      // setError(err.message);
+      //  Alert.alert("Error", err.message);
     }
   };
 
@@ -166,7 +171,7 @@ const EventDetailsScreen = () => {
               console.log("Delete Column Response:", response.data);
 
               if (response.data.status === 1) {
-                navigation.replace("BookList");
+                navigation.goBack();
               } else {
                 throw new Error(
                   response.data.message || "Failed to delete book"
@@ -252,8 +257,9 @@ const EventDetailsScreen = () => {
   // Loading state
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading event details...</Text>
+      <View style={styles.loadMoreContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadMoreText}>Loading event details...</Text>
       </View>
     );
   }
@@ -293,14 +299,14 @@ const EventDetailsScreen = () => {
             <ChevronLeft color={Colors.textPrimary} size={24} />
           </TouchableOpacity>
           <View style={styles.headerActionsContainer}>
-            <IconButton
+            {/*  <IconButton
               icon={() => <Edit color={primary} size={24} />}
               onPress={() =>
                 navigation.navigate("EditEvent", {
                   bookColumnId: eventDetails.id,
                 })
               }
-            />
+            />*/}
             <IconButton
               icon={() => <Trash2 color="red" size={24} />}
               onPress={handleDeleteEvent}
@@ -368,6 +374,7 @@ const EventDetailsScreen = () => {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
+          mapType="satellite"
         >
           <Marker
             coordinate={{
@@ -385,13 +392,13 @@ const EventDetailsScreen = () => {
           >
             Open in Maps
           </Button>
-          <Button
+          {/*   <Button
             mode="contained"
             onPress={repickLocation}
             style={styles.mapActionButton}
           >
             Repick Location
-          </Button>
+          </Button>*/}
         </View>
       </Card>
 
@@ -544,6 +551,15 @@ const styles = StyleSheet.create({
   attendanceCard: {
     marginBottom: 15,
     borderRadius: 10,
+  },
+  loadMoreContainer: {
+    alignItems: "center",
+    padding: 10,
+    justifyContent: "center",
+  },
+  loadMoreText: {
+    fontFamily: "Quicksand-Medium",
+    color: textSecondary,
   },
 });
 

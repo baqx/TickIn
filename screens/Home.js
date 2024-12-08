@@ -16,6 +16,7 @@ import {
   BookOpen,
   Users,
   FileText,
+  Calendar,
 } from "lucide-react-native";
 import moment from "moment";
 import * as SecureStore from "expo-secure-store";
@@ -153,7 +154,9 @@ const HomeScreen = ({}) => {
   if (error || !userProfile) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load profile</Text>
+        <Text style={styles.errorText}>
+          Check your internet connection and try again
+        </Text>
         <Button
           mode="contained"
           onPress={fetchUserProfile}
@@ -217,9 +220,9 @@ const HomeScreen = ({}) => {
 
       {/* Activity Log */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={styles.sectionTitle}>Recent Activities</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate("AttendanceHistory")}
+          onPress={() => navigation.navigate("My Subscriptions")}
         >
           <Text style={styles.showAllText}>Show All</Text>
         </TouchableOpacity>
@@ -252,6 +255,7 @@ const HomeScreen = ({}) => {
             navigation.navigate("Attend");
           }}
         />
+        
         <QuickActionButton
           icon={<FileText color={accent} size={24} />}
           title="Attendance History"
@@ -260,6 +264,15 @@ const HomeScreen = ({}) => {
           }}
         />
       </View>
+      <View style={styles.quickActionsContainer}>
+        <QuickActionButton
+          icon={<Calendar color={primary} size={24} />}
+          title="My Attendance Subscriptions"
+          onPress={() => {
+            navigation.navigate("Subscriptions");
+          }}
+        />
+        </View>
 
       {/* Admin & Moderator Actions */}
       <View style={styles.sectionHeader}>
@@ -312,7 +325,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: white,
+    backgroundColor: Colors.background,
   },
   loadingText: {
     marginTop: 10,
@@ -444,6 +457,9 @@ const styles = StyleSheet.create({
   },
   activityLogTitle: {
     fontFamily: "Quicksand-SemiBold",
+    color: textPrimary,
+  },
+  activityLogSubtitle: {
     color: textPrimary,
   },
   activityLogTimestamp: {

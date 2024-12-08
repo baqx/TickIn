@@ -18,10 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 
 // Configuration and API endpoints
 const API_BASE_URL = Config.BASE_URL;
-const ADMIN_PASS = "test"; // Securely manage this
+const ADMIN_PASS = Config.PASS; // Securely manage this
 
-const SignupScreen = ({ navigation }) => {
+const SignupScreen = ({}) => {
   // Form state
+  const navigation = useNavigation();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -38,7 +39,20 @@ const SignupScreen = ({ navigation }) => {
   const [matricNo, setMatricNo] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  useEffect(() => {
+    const checkUserToken = async () => {
+      try {
+        const userToken = await SecureStore.getItemAsync("userToken");
+        if (userToken && userToken.trim() !== "") {
+          navigation.replace("BottomNav");
+        }
+      } catch (error) {
+        console.error("Failed to retrieve userToken from SecureStore:", error);
+      }
+    };
 
+    checkUserToken();
+  }, [navigation]);
   // Fetch universities on component mount
   useEffect(() => {
     fetchUniversities();
@@ -245,7 +259,7 @@ const SignupScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("Onboarding")}>
         <Ionicons name="chevron-back" size={30} />
-      </TouchableOpacity>   
+      </TouchableOpacity>
       <Text style={styles.title}>Create an Account</Text>
       {/* Username Input */}
       <TextInput
@@ -295,7 +309,7 @@ const SignupScreen = ({ navigation }) => {
           selectedValue={university}
           onValueChange={(itemValue) => setUniversity(itemValue)}
         >
-          <Picker.Item label="Select University"  value="" />
+          <Picker.Item label="Select University" value="" />
           {universities.map((uni) => (
             <Picker.Item key={uni.id} label={uni.name} value={uni.id} />
           ))}

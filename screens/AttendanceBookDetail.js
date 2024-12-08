@@ -9,7 +9,11 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Card, Button, IconButton } from "react-native-paper";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import {
   FileText,
   Edit,
@@ -49,7 +53,11 @@ const AttendanceBookDetailScreen = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
-
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchBookDetails(true);
+    }, [route.params.bookId])
+  );
   // Fetch book details and events
   const fetchBookDetails = async (resetPage = false) => {
     try {
@@ -73,16 +81,16 @@ const AttendanceBookDetailScreen = () => {
 
       // Make API call using Axios
       const response = await axios.post(
-        `${Config.BASE_URL}/book/book-details`, 
+        `${Config.BASE_URL}/book/book-details`,
         requestBody,
         {
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
-      console.log('API Response:', response.data);
+      console.log("API Response:", response.data);
 
       // Check response status
       if (response.data.status === 1) {
@@ -91,8 +99,8 @@ const AttendanceBookDetailScreen = () => {
 
         // Update events (reset or append)
         setEvents((prevEvents) =>
-          currentPage === 1 
-            ? response.data.events 
+          currentPage === 1
+            ? response.data.events
             : [...prevEvents, ...response.data.events]
         );
 
@@ -101,9 +109,9 @@ const AttendanceBookDetailScreen = () => {
         setPage(currentPage);
       } else {
         // Handle API-level error
-        console.error('API Error:', response.data.message);
+        console.error("API Error:", response.data.message);
         Alert.alert(
-          "Error", 
+          "Error",
           response.data.message || "Failed to fetch book details"
         );
       }
@@ -111,20 +119,20 @@ const AttendanceBookDetailScreen = () => {
       // Handle network or other errors
       if (axios.isAxiosError(error)) {
         // Axios-specific error handling
-        console.error('Axios Error:', {
+        console.error("Axios Error:", {
           message: error.message,
           status: error.response?.status,
-          data: error.response?.data
+          data: error.response?.data,
         });
 
         Alert.alert(
-          "Network Error", 
-          error.response?.data?.message || 
-          "Failed to fetch book details. Please check your connection."
+          "Network Error",
+          error.response?.data?.message ||
+            "Failed to fetch book details. Please check your connection."
         );
       } else {
         // Handle other types of errors
-        console.error('Unexpected Error:', error);
+        console.error("Unexpected Error:", error);
         Alert.alert("Error", "An unexpected error occurred");
       }
     } finally {
@@ -139,22 +147,55 @@ const AttendanceBookDetailScreen = () => {
   }, [route.params.bookId]);
 
   // Download Excel functionality
+  // Download Excel functionality
   const downloadExcel = async () => {
     try {
-      // Simulate Excel generation
-      const fileUri =
-        FileSystem.documentDirectory + `${bookDetails.name}_attendance.xlsx`;
+      // Make API call to generate Excel file
+      const response = await axios.post(
+        Config.BASE_URL + "/book/download-book",
+        {
+          book_id: bookDetails.book_id,
+          pass: Config.PASS,
+        }
+      );
 
-      // In a real app, generate actual Excel file
-      await FileSystem.writeAsStringAsync(fileUri, "Simulated Excel Content");
+      // Check if Excel file generation was successful
+      if (response.data.status === 1) {
+        // Decode base64 file contents
+        const fileContents = response.data.file;
+        const fileName = response.data.filename;
 
-      // Share the file
-      if (await Sharing.isAvailableAsync()) {
+        // Create file URI using Expo FileSystem
+        const fileUri = FileSystem.documentDirectory + fileName;
+
+        // Write file contents to local storage
+        await FileSystem.writeAsStringAsync(fileUri, fileContents, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        console.log("File downloaded to:", fileUri);
+
+        // Show success alert
+        Alert.alert(
+          "Success",
+          "Excel file downloaded successfully to " + fileUri
+        );
+
+        // Open the file using Sharing
         await Sharing.shareAsync(fileUri);
+
+        return fileUri;
+      } else {
+        // Show error alert if file generation failed
+        Alert.alert(
+          "Error",
+          response.data.message || "Failed to generate Excel file"
+        );
+        return null;
       }
     } catch (error) {
-      console.error('Download Excel Error:', error);
+      console.error("Download Excel Error:", error);
       Alert.alert("Error", "Failed to download Excel");
+      return null;
     }
   };
 
@@ -180,28 +221,30 @@ const AttendanceBookDetailScreen = () => {
                 {
                   pass: Config.PASS,
                   user_id: userToken,
-                  book_id: bookDetails.book_id
+                  book_id: bookDetails.book_id,
                 },
                 {
                   headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                   },
                 }
               );
 
-              console.log('Delete Book Response:', response.data);
+              console.log("Delete Book Response:", response.data);
 
               if (response.data.status === 1) {
                 navigation.replace("BottomNav");
               } else {
-                throw new Error(response.data.message || "Failed to delete book");
+                throw new Error(
+                  response.data.message || "Failed to delete book"
+                );
               }
             } catch (error) {
               //console.error('Delete Book Error:', error);
               Alert.alert(
-                "Error", 
-                axios.isAxiosError(error) 
-                  ? error.response?.data?.message 
+                "Error",
+                axios.isAxiosError(error)
+                  ? error.response?.data?.message
                   : "Failed to delete attendance book"
               );
             }
@@ -214,7 +257,9 @@ const AttendanceBookDetailScreen = () => {
   // Render Event Item
   const renderEventItem = ({ item }) => (
     <TouchableOpacity
-      onPress={() => navigation.navigate("EventDetails", { bookColumnId: item.id })}
+      onPress={() =>
+        navigation.navigate("EventDetails", { bookColumnId: item.id })
+      }
     >
       <Card style={styles.eventCard}>
         <View style={styles.eventCardContent}>
@@ -285,14 +330,14 @@ const AttendanceBookDetailScreen = () => {
           </Text>
         </View>
         <View style={styles.headerActionsContainer}>
-          <IconButton
+         {/*   <IconButton
             icon={() => <Edit color={primary} size={24} />}
             onPress={() =>
               navigation.navigate("EditAttendanceBook", {
                 bookId: bookDetails.book_id,
               })
             }
-          />
+          /> */}
           <IconButton
             icon={() => <Trash2 color="red" size={24} />}
             onPress={handleDeleteBook}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,14 +10,29 @@ import {
   Animated,
 } from "react-native";
 import { Colors } from "../styles/styles";
-
+import { useNavigation } from "@react-navigation/native";
+import * as SecureStore from "expo-secure-store";
 const { width: screenWidth } = Dimensions.get("window");
 
-const OnboardingScreen = ({ navigation }) => {
+const OnboardingScreen = ({}) => {
+  const navigation = useNavigation();
   const [activeSlide, setActiveSlide] = useState(0);
   const scrollViewRef = useRef(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const checkUserToken = async () => {
+      try {
+        const userToken = await SecureStore.getItemAsync("userToken");
+        if (userToken && userToken.trim() !== "") {
+          navigation.replace("BottomNav");
+        }
+      } catch (error) {
+        console.error("Failed to retrieve userToken from SecureStore:", error);
+      }
+    };
 
+    checkUserToken();
+  }, [navigation]);
   const carouselItems = [
     {
       image: require("../assets/images/onboarding-1.png"), // Replace with your image paths
@@ -210,12 +225,12 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
-   fontFamily:"Quicksand-SemiBold",
+    fontFamily: "Quicksand-SemiBold",
   },
   signupButtonText: {
     color: Colors.primary,
     fontSize: 18,
-   fontFamily:"Quicksand-SemiBold",
+    fontFamily: "Quicksand-SemiBold",
   },
 });
 

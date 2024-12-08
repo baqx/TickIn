@@ -7,55 +7,146 @@ import {
   TouchableOpacity,
   TextInput,
   Platform,
+  Alert,
 } from "react-native";
-import { Card, Button, Snackbar } from "react-native-paper";
+import { Card, Button, Snackbar, Switch } from "react-native-paper";
 import MapView, { Marker } from "react-native-maps";
-import { CheckCircle, MapPin } from "lucide-react-native";
+import { CheckCircle, MapPin, ReceiptText } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
+import axios from "axios";
 import { Colors } from "../styles/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-
+import Config from "../config/Config";
+import * as SecureStore from "expo-secure-store";
 const { width, height } = Dimensions.get("window");
 const { primary, white, textPrimary, textSecondary, success, background } =
   Colors;
 
-const AttendScreen = ({ currentTab }) => {
+const API_URL = Config.BASE_URL + "/attendance/attendance";
+const ADMIN_PASS = Config.PASS; // Replace with actual admin pass
+
+const AttendScreen = ({ currentTab, userId }) => {
   const navigation = useNavigation();
   const [attendanceCode, setAttendanceCode] = useState("");
   const [lectureDetails, setLectureDetails] = useState(null);
   const [isCodeSubmitted, setIsCodeSubmitted] = useState(false);
   const [isAttendanceMarked, setIsAttendanceMarked] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarVisible1, setSnackbarVisible1] = useState(false);
+  const [snackbarMessage1, setSnackbarMessage1] = useState("");
+ 
   const [longPressProgress, setLongPressProgress] = useState(0);
   const longPressTimerRef = useRef(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [isEnabled, setIsEnabled] = useState(false);
 
-  // Mock function to validate attendance code
-  const validateAttendanceCode = (code) => {
-    // In a real app, this would be an API call
-    if (code === "123456") {
-      return {
-        lectureName: "CHM 101",
-        location: "JAO 3",
-        checkedInStudents: 42,
-        lectureTime: "4:00PM - 6:00 PM",
-        coordinates: {
-          latitude: 7.229908867558553,
-          longitude: 3.4391506225427126,
-        },
-      };
+  const handleSubscriptionToggle = async () => {
+    try {
+      const response = await axios.post(
+        Config.BASE_URL + "/attendance/subscribe",
+        {
+          pass: ADMIN_PASS,
+          action: isEnabled ? "unsubscribe" : "subscribe",
+          book_column_id: lectureDetails.book_column_id,
+          user_id: await SecureStore.getItemAsync("userToken"),
+        }
+      );
+
+      if (response.data.status === 1) {
+        setIsEnabled(!isEnabled); // Toggle the subscription status
+        setSnackbarMessage1(
+          isEnabled ? "Unsubscribed successfully! You will no longer receive notifications from this attendance book" : "Subscribed successfully! We will notify you when a new attendance drops for this book"
+        );
+        setSnackbarVisible1(true);
+      } else {
+        setSnackbarMessage(
+          response.data.message || "Failed to update subscription"
+        );
+        setSnackbarVisible(true);
+      }
+    } catch (error) {
+      setSnackbarMessage("Error updating subscription");
+      setSnackbarVisible(true);
     }
-    return null;
+  };
+ 
+  useEffect(() => {
+    // Request location permissions
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Needed",
+          "Location permission is required to mark attendance."
+        );
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    })();
+  }, []);
+
+  const toggleSubscription = () => {
+    handleSubscriptionToggle(); // Call the subscription handler
+  };
+  const fetchEventDetails = async () => {
+    try {
+      const response = await axios.post(API_URL, {
+        pass: ADMIN_PASS,
+        action: "get_event_details",
+        identifier_type: "shortcode",
+        identifier: attendanceCode,
+        user_id: await SecureStore.getItemAsync("userToken"),
+      });
+
+      if (response.data.status === 1) {
+        const eventData = response.data.data;
+
+        if (eventData.hasMarkedAttendance) {
+          setSnackbarMessage(
+            "You have already marked attendance for this event."
+          );
+          setSnackbarVisible(true);
+          return;
+        }
+
+        setLectureDetails({
+          lectureName: eventData.book_title,
+          location: eventData.column_name,
+          location_name: eventData.location_name,
+          checkedInStudents: eventData.total_attendance,
+          coordinates: {
+            latitude: parseFloat(eventData.latitude),
+            longitude: parseFloat(eventData.longitude),
+          },
+          book_column_id: eventData.column_id,
+        });
+        setIsEnabled(eventData.isSubscribed)
+        setIsCodeSubmitted(true);
+      } else {
+        setSnackbarMessage(response.data.message || "Invalid attendance code");
+        setSnackbarVisible(true);
+      }
+    } catch (error) {
+      setSnackbarMessage("Error fetching event details");
+      setSnackbarVisible(true);
+    }
   };
 
   const handleCodeSubmit = () => {
-    const details = validateAttendanceCode(attendanceCode);
-    if (details) {
-      setLectureDetails(details);
-      setIsCodeSubmitted(true);
-    } else {
+    if (attendanceCode.length !== 6) {
+      setSnackbarMessage("Please enter a 6-digit code");
       setSnackbarVisible(true);
+      return;
     }
+    fetchEventDetails();
   };
 
   const startLongPress = () => {
@@ -72,7 +163,7 @@ const AttendScreen = ({ currentTab }) => {
         const newProgress = prevProgress + 10;
         if (newProgress >= 100) {
           clearInterval(longPressTimerRef.current);
-          setIsAttendanceMarked(true);
+          markAttendance();
           return 100;
         }
         return newProgress;
@@ -85,6 +176,47 @@ const AttendScreen = ({ currentTab }) => {
       clearInterval(longPressTimerRef.current);
       setLongPressProgress(0);
     }
+  };
+
+  const markAttendance = async () => {
+    if (!userLocation) {
+      setSnackbarMessage(
+        "Location not available. Please enable location services."
+      );
+      setSnackbarVisible(true);
+      return;
+    }
+
+    try {
+      const response = await axios.post(API_URL, {
+        pass: ADMIN_PASS,
+        action: "mark_attendance",
+        book_column_id: lectureDetails.book_column_id,
+        user_id: await SecureStore.getItemAsync("userToken"),
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+      });
+
+      if (response.data.status === 1) {
+        setIsAttendanceMarked(true);
+      } else {
+        setSnackbarMessage(
+          response.data.message || "Failed to mark attendance"
+        );
+        setSnackbarVisible(true);
+      }
+    } catch (error) {
+      setSnackbarMessage("Error marking attendance");
+      setSnackbarVisible(true);
+    }
+  };
+
+  const resetScreen = () => {
+    setIsCodeSubmitted(false);
+    setIsAttendanceMarked(false);
+    setAttendanceCode("");
+    setLectureDetails(null);
+    setLongPressProgress(0);
   };
 
   return (
@@ -100,7 +232,7 @@ const AttendScreen = ({ currentTab }) => {
           />
         </TouchableOpacity>
       ) : (
-       <></>
+        <></>
       )}
       {!isCodeSubmitted && (
         <View style={styles.codeInputContainer}>
@@ -127,14 +259,36 @@ const AttendScreen = ({ currentTab }) => {
       {isCodeSubmitted && !isAttendanceMarked && lectureDetails && (
         <View style={styles.lectureDetailsContainer}>
           <Card style={styles.lectureCard}>
+            <TouchableOpacity onPress={toggleSubscription}>
+              <Ionicons
+                name={
+                  isEnabled ? "notifications-sharp" : "notifications-outline"
+                }
+                size={30}
+                style={{
+                  alignSelf: "flex-end",
+                }}
+                color={isEnabled ? Colors.primary : Colors.textSecondary}
+              />
+            </TouchableOpacity>
             <View style={styles.lectureCardContent}>
               <Text style={styles.lectureName}>
                 {lectureDetails.lectureName}
               </Text>
+              <Text style={styles.subscriptionStatus}>
+                {isEnabled ? "Subscribed" : ""}
+              </Text>
+
+              <View style={styles.lectureInfoRow}>
+                <ReceiptText color={primary} size={20} />
+                <Text style={styles.lectureInfoText}>
+                  {lectureDetails.location}
+                </Text>
+              </View>
               <View style={styles.lectureInfoRow}>
                 <MapPin color={primary} size={20} />
                 <Text style={styles.lectureInfoText}>
-                  {lectureDetails.location}
+                  {lectureDetails.location_name}
                 </Text>
               </View>
               <View style={styles.lectureInfoRow}>
@@ -156,10 +310,13 @@ const AttendScreen = ({ currentTab }) => {
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
+                showsUser
+                Location={true}
+                mapType="satellite"
               >
                 <Marker
                   coordinate={lectureDetails.coordinates}
-                  title={lectureDetails.location}
+                  title={lectureDetails.location_name}
                 />
               </MapView>
             </View>
@@ -225,12 +382,20 @@ const AttendScreen = ({ currentTab }) => {
 
       {/* Error Snackbar */}
       <Snackbar
+        visible={snackbarVisible1}
+        onDismiss={() => setSnackbarVisible1(false)}
+        duration={3000}
+        style={styles.snackbar1}
+      >
+          {snackbarMessage1}
+      </Snackbar>
+      <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={3000}
         style={styles.snackbar}
       >
-        Invalid Attendance Code
+        {snackbarMessage}
       </Snackbar>
     </View>
   );
@@ -251,6 +416,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: textPrimary,
     marginBottom: 20,
+  },
+  subscriptionStatus: {
+    fontFamily: "Quicksand-Medium",
+    color: textSecondary,
+    marginTop: 5,
   },
   codeInput: {
     width: width * 0.8,
@@ -353,6 +523,9 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     backgroundColor: Colors.error,
+  },
+  snackbar1: {
+    backgroundColor: Colors.success,
   },
 });
 

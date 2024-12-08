@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -16,9 +16,10 @@ import { Colors } from "../styles/styles";
 import { Eye, EyeOff } from "lucide-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import * as SecureStore from 'expo-secure-store';
-import { ActivityIndicator } from 'react-native-paper';
+import * as SecureStore from "expo-secure-store";
+import { ActivityIndicator, Snackbar } from "react-native-paper";
 import Config from "../config/Config";
+import { useNavigation } from "@react-navigation/native";
 
 // Validation Schema
 const LoginSchema = Yup.object().shape({
@@ -26,43 +27,58 @@ const LoginSchema = Yup.object().shape({
     .email("Invalid email address")
     .required("Email is required"),
   password: Yup.string()
-    .min(8, "Password must be at least 8 characters")
+    .min(5, "Password must be at least 8 characters")
     .required("Password is required"),
 });
 
-
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({}) => {
+  const navigation = useNavigation();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    const checkUserToken = async () => {
+      try {
+        const userToken = await SecureStore.getItemAsync("userToken");
+        if (userToken && userToken.trim() !== "") {
+          navigation.replace("BottomNav");
+        }
+      } catch (error) {
+        console.error("Failed to retrieve userToken from SecureStore:", error);
+      }
+    };
+
+    checkUserToken();
+  }, [navigation]);
   const handleLogin = async (values) => {
     setIsLoading(true);
     try {
-      const response = await axios.post(Config.BASE_URL+"/auth/login", {
+      const response = await axios.post(Config.BASE_URL + "/auth/login", {
         pass: Config.PASS,
         username: values.email,
         password: values.password,
-        func: 'login'
+        func: "login",
       });
 
       // Check the response status
       if (response.data.status === "1") {
         // Store user token securely
-        await SecureStore.setItemAsync('userToken', response.data.uid);
+        await SecureStore.setItemAsync("userToken", response.data.uid);
         
         // Show success message
-        Alert.alert('Success', 'Login Successful');
-        
+        Alert.alert("Success", "Login Successful");
+
         // Navigate to home page
-        navigation.replace('BottomNav'); // Make sure you have a Home screen in your navigation
+        navigation.replace("BottomNav"); // Make sure you have a Home screen in your navigation
+        
       } else {
         // Show error message from backend
-        Alert.alert('Login Failed', response.data.message);
+        Alert.alert("Login Failed", response.data.message);
       }
     } catch (error) {
       // Handle network or other errors
-      console.error('Login Error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error("Login Error:", error);
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -186,10 +202,7 @@ const LoginScreen = ({ navigation }) => {
           {/* Sign Up Link */}
           <View style={styles.signUpContainer}>
             <Text style={styles.signUpText}>Don't have an account? </Text>
-            <TouchableOpacity 
-              onPress={handleSignUp}
-              disabled={isLoading}
-            >
+            <TouchableOpacity onPress={handleSignUp} disabled={isLoading}>
               <Text style={styles.signUpLinkText}>Sign Up</Text>
             </TouchableOpacity>
           </View>
