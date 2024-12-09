@@ -35,8 +35,10 @@ import ProfileEditScreen from "./screens/ProfileEdit";
 import CreateEventScreen from "./screens/CreateEvent";
 import SubscriptionsScreen from "./screens/SubscriptionsScreen";
 import * as Device from "expo-device";
-import Constants from 'expo-constants';
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import axios from "axios";
+import Config from "./config/Config";
 const Stack = createNativeStackNavigator();
 
 Notifications.setNotificationHandler({
@@ -109,7 +111,7 @@ export default function App() {
         finalStatus = status;
       }
       if (finalStatus !== "granted") {
-        alert("Failed to get push token for push notification!");
+        alert("Please enable notifications permission in your app settings");
         return;
       }
       token = (
@@ -119,6 +121,22 @@ export default function App() {
       ).data;
 
       console.log(token);
+      const userToken = await SecureStore.getItemAsync("userToken");
+      if (userToken) {
+        try {
+          const response = await axios.post(
+            Config.BASE_URL + "/user/pushtoken",
+            {
+              token: token,
+              userId: userToken,
+              pass: Config.PASS,
+            }
+          );
+          console.log("Token posted successfully:", response.data);
+        } catch (error) {
+          console.error("Error posting token:", error);
+        }
+      }
     } else {
       alert("Must use physical device for Push Notifications");
     }
