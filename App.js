@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, StyleSheet, StatusBar, Platform, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -6,11 +6,14 @@ import { PaperProvider } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import NetInfo from "@react-native-community/netinfo";
-import * as Location from 'expo-location';
+import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
 
 // Import custom components and modals
-import { NoInternetModal, LocationPermissionModal } from "./components/InternetLocationModals";
+import {
+  NoInternetModal,
+  LocationPermissionModal,
+} from "./components/InternetLocationModals";
 
 // Import screens
 import { Colors } from "./styles/styles";
@@ -31,13 +34,26 @@ import EventDetailsScreen from "./screens/EventDetails";
 import ProfileEditScreen from "./screens/ProfileEdit";
 import CreateEventScreen from "./screens/CreateEvent";
 import SubscriptionsScreen from "./screens/SubscriptionsScreen";
-
+import * as Device from "expo-device";
+import Constants from 'expo-constants';
+import * as Notifications from "expo-notifications";
 const Stack = createNativeStackNavigator();
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 export default function App() {
   const [isConnected, setIsConnected] = useState(true);
   const [locationStatus, setLocationStatus] = useState(null);
   const [initialRoute, setInitialRoute] = useState(null);
+  const [expoPushToken, setExpoPushToken] = useState("");
+  const notificationListener = useRef();
+  const responseListener = useRef();
+  const [notification, setNotification] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     Quicksand: require("./assets/fonts/Quicksand-Regular.ttf"),
@@ -46,10 +62,72 @@ export default function App() {
     "Quicksand-SemiBold": require("./assets/fonts/Quicksand-SemiBold.ttf"),
     "Quicksand-Medium": require("./assets/fonts/Quicksand-Medium.ttf"),
   });
+  useEffect(() => {
+    registerForPushNotificationsAsync().then((token) =>
+      setExpoPushToken(token)
+    );
 
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener((notification) => {
+        setNotification(notification);
+      });
+
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const url = response.notification.request.content.data.url;
+        if (url) {
+          //nothing
+        }
+      });
+
+    return () => {
+      Notifications.removeNotificationSubscription(
+        notificationListener.current
+      );
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
+
+  async function registerForPushNotificationsAsync() {
+    let token;
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#FF231F7C",
+      });
+    }
+
+    if (Device.isDevice) {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== "granted") {
+        alert("Failed to get push token for push notification!");
+        return;
+      }
+      token = (
+        await Notifications.getExpoPushTokenAsync({
+          projectId: Constants.expoConfig.extra.eas.projectId,
+        })
+      ).data;
+
+      console.log(token);
+    } else {
+      alert("Must use physical device for Push Notifications");
+    }
+
+    return token;
+  }
   // Check internet connection
   useEffect(() => {
-    const unsubscribeNetInfo = NetInfo.addEventListener(state => {
+    const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected);
     });
 
@@ -65,21 +143,21 @@ export default function App() {
         // Check if location services are enabled
         let enabled = await Location.hasServicesEnabledAsync();
         if (!enabled) {
-          setLocationStatus('disabled');
+          setLocationStatus("disabled");
           return;
         }
 
         // Check permission status
         let { status } = await Location.getForegroundPermissionsAsync();
-        
-        if (status !== 'granted') {
-          setLocationStatus('not-granted');
+
+        if (status !== "granted") {
+          setLocationStatus("not-granted");
         } else {
-          setLocationStatus('granted');
+          setLocationStatus("granted");
         }
       } catch (error) {
-        console.error('Location permission check error:', error);
-        setLocationStatus('error');
+        console.error("Location permission check error:", error);
+        setLocationStatus("error");
       }
     };
 
@@ -204,7 +282,7 @@ export default function App() {
                   component={ProfileEditScreen}
                   options={{ headerShown: false }}
                 />
-                  <Stack.Screen
+                <Stack.Screen
                   name="Subscriptions"
                   component={SubscriptionsScreen}
                   options={{ headerShown: false }}
@@ -213,7 +291,7 @@ export default function App() {
             )}
           </NavigationContainer>
         </PaperProvider>
-        
+
         {/* Internet and Location Modals */}
         <NoInternetModal />
         <LocationPermissionModal />
