@@ -35,8 +35,6 @@ import SubscriptionsScreen from "./screens/SubscriptionsScreen";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  const [btmcolor, setbtmcolor] = useState("#000");
-  const [btmbgcolor, setbtmbgcolor] = useState("#000");
   const [isConnected, setIsConnected] = useState(true);
   const [locationStatus, setLocationStatus] = useState(null);
   const [initialRoute, setInitialRoute] = useState(null);

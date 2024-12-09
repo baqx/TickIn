@@ -461,9 +461,10 @@ const styles = StyleSheet.create({
   },
   activityLogSubtitle: {
     color: textPrimary,
+    fontFamily: "Quicksand-Medium",
   },
   activityLogTimestamp: {
-    fontFamily: "Quicksand-Regular",
+    fontFamily: "Quicksand",
     color: textSecondary,
     fontSize: 12,
   },
