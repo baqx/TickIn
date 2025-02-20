@@ -45,15 +45,22 @@ const BooksListScreen = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${Config.BASE_URL}/book/books`, {
-        pass: Config.PASS,
-        user_id: userToken,
-        search: searchQuery,
-        page: resetData ? 1 : page,
-        per_page: 5,
-        sort_by: "created_at",
-        sort_order: "DESC",
-      });
+      const response = await axios.post(
+        `${Config.BASE_URL}/book/books`,
+        {
+          user_id: userToken,
+          search: searchQuery,
+          page: resetData ? 1 : page,
+          per_page: 5,
+          sort_by: "created_at",
+          sort_order: "DESC",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
       //console.log(response.data);
       if (response.data.status === 1) {
         const { data, pagination } = response.data;

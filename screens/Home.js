@@ -7,6 +7,7 @@ import {
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { Avatar, Card, Button, Surface, Chip } from "react-native-paper";
 import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
@@ -17,11 +18,13 @@ import {
   Users,
   FileText,
   Calendar,
+  PlusCircle,
+  Book,
 } from "lucide-react-native";
 import moment from "moment";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
-
+import * as Application from "expo-application";
 import { Colors } from "../styles/styles";
 import Config from "../config/Config";
 import { useNavigation } from "@react-navigation/native";
@@ -46,6 +49,7 @@ const HomeScreen = ({}) => {
   const [error, setError] = useState(null);
   const navigation = useNavigation();
   // Fetch user profile
+
   const fetchUserProfile = async () => {
     try {
       // Retrieve user token from secure store
@@ -56,23 +60,34 @@ const HomeScreen = ({}) => {
       }
 
       // Fetch user profile
-      const profileResponse = await axios.post(Config.BASE_URL + "/user/user", {
-        user_id: userToken,
-        pass: Config.PASS,
-      });
+      const profileResponse = await axios.post(
+        Config.BASE_URL + "/user/user",
+        {
+          user_id: userToken,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       // Fetch attendance history
       const historyResponse = await axios.post(
         Config.BASE_URL + "/attendance/attendance-history",
         {
           user_id: userToken,
-          pass: Config.PASS,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
         }
       );
 
       if (profileResponse.data.status === 1) {
         setUserProfile({
-          name: `${profileResponse.data.data.username}`,
+          name: `${profileResponse.data.data.fullname}`,
           university: profileResponse.data.data.university_name,
           faculty: profileResponse.data.data.faculty_name,
           department: profileResponse.data.data.department_name,
@@ -176,7 +191,7 @@ const HomeScreen = ({}) => {
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.userNameText}>{userProfile.name}</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate("ProfileEdit")}>
+        <TouchableOpacity onPress={() => navigation.navigate("EditProfile")}>
           <Avatar.Text size={40} label={userProfile.name.charAt(0)} />
         </TouchableOpacity>
       </View>
@@ -222,7 +237,7 @@ const HomeScreen = ({}) => {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Activities</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate("My Subscriptions")}
+          onPress={() => navigation.navigate("AttendanceHistory")}
         >
           <Text style={styles.showAllText}>Show All</Text>
         </TouchableOpacity>
@@ -255,7 +270,7 @@ const HomeScreen = ({}) => {
             navigation.navigate("Attend");
           }}
         />
-        
+
         <QuickActionButton
           icon={<FileText color={accent} size={24} />}
           title="Attendance History"
@@ -272,47 +287,72 @@ const HomeScreen = ({}) => {
             navigation.navigate("Subscriptions");
           }}
         />
-        </View>
+      </View>
 
+      {/* Admin & Moderator Actions */}
       {/* Admin & Moderator Actions */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Admin Actions</Text>
       </View>
       <View style={styles.adminActionsContainer}>
-        <Chip
-          icon={() => <Users color={primary} size={20} />}
+        <QuickActionButton
+          icon={<PlusCircle color={primary} size={20} />}
+          title="Create Attendance"
           onPress={() => {
             navigation.navigate("CreateAttendance");
           }}
-          style={styles.adminActionChip}
-        >
-          Create Attendance
-        </Chip>
-        <Chip
-          icon={() => <FileText color={accent} size={20} />}
+        />
+        <QuickActionButton
+          icon={<Book color={accent} size={20} />}
+          title="Attendance Books"
           onPress={() => {
             navigation.navigate("BooksList");
           }}
-          style={styles.adminActionChip}
-        >
-          <Text style={{ fontFamily: "Sandbook" }}>Attendance Books</Text>
-        </Chip>
+        />
       </View>
 
-      {/* Ads Section */}
+      {/* Ads Section 
       <Card style={styles.adsCard}>
         <View style={styles.adsContent}>
           <Text style={styles.adsTitle}>Special Offer!</Text>
           <Text style={styles.adsSubtitle}>Get Premium Features Now</Text>
           <Button
             mode="outlined"
-            onPress={() => {
-              /* Handle Upgrade */
-            }}
+            onPress={() => {}}
             style={styles.adsButton}
             labelStyle={{ fontFamily: "Quicksand" }}
           >
             Upgrade
+          </Button>
+        </View>
+      </Card>
+      */}
+      <Card style={styles.adsCard}>
+        <View style={styles.adsContent}>
+          <Text style={styles.adsTitle}>
+            Thanks for using our beta version{" "}
+            {Application.nativeApplicationVersion} !
+          </Text>
+          <Text style={styles.adsSubtitle}>
+            We are still working on making the app better at this time,kindly
+            contact us if any bug arise
+          </Text>
+          <Button
+            mode="outlined"
+            onPress={() => {
+              const phoneNumber = "+2349019659410";
+              const message = "Hello! I am a user of the TickIn beta app."; // You can customize the message if needed
+              const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
+                message
+              )}`;
+              Linking.openURL(url).catch((err) =>
+                console.error("Error opening WhatsApp:", err)
+              );
+            }}
+            style={styles.adsButton}
+            labelStyle={{ fontFamily: "Quicksand" }}
+          >
+            Get In touch
           </Button>
         </View>
       </Card>

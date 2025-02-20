@@ -73,7 +73,6 @@ const AttendanceBookDetailScreen = () => {
 
       // Prepare request body
       const requestBody = {
-        pass: Config.PASS, // Replace with actual admin pass
         user_id: userToken,
         book_id: route.params.bookId,
         page: currentPage,
@@ -86,6 +85,7 @@ const AttendanceBookDetailScreen = () => {
         {
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${Config.PASS}`,
           },
         }
       );
@@ -155,7 +155,11 @@ const AttendanceBookDetailScreen = () => {
         Config.BASE_URL + "/book/download-book",
         {
           book_id: bookDetails.book_id,
-          pass: Config.PASS,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
         }
       );
 
@@ -219,13 +223,13 @@ const AttendanceBookDetailScreen = () => {
               const response = await axios.post(
                 `${Config.BASE_URL}/book/delete-book`,
                 {
-                  pass: Config.PASS,
                   user_id: userToken,
                   book_id: bookDetails.book_id,
                 },
                 {
                   headers: {
                     "Content-Type": "application/json",
+                    Authorization: `Bearer ${Config.PASS}`,
                   },
                 }
               );
@@ -307,7 +311,7 @@ const AttendanceBookDetailScreen = () => {
   if (!bookDetails) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading book details...</Text>
+        <Text style={styles.loadMoreText}>Loading book details...</Text>
       </View>
     );
   }
@@ -330,7 +334,7 @@ const AttendanceBookDetailScreen = () => {
           </Text>
         </View>
         <View style={styles.headerActionsContainer}>
-         {/*   <IconButton
+          {/*   <IconButton
             icon={() => <Edit color={primary} size={24} />}
             onPress={() =>
               navigation.navigate("EditAttendanceBook", {
@@ -406,6 +410,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: Colors.background,
   },
 
   container: {
@@ -517,7 +522,7 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontFamily: "Quicksand-Medium",
-    color: textSecondary,
+    color: Colors.textPrimary,
   },
 });
 

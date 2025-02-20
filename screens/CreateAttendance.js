@@ -52,15 +52,22 @@ const CreateAttendanceScreen = () => {
       }
 
       // API request to create attendance book
-      const response = await axios.post(Config.BASE_URL + "/book/create", {
-        pass: Config.PASS, // Replace with actual admin password
-        user_id: userToken, // Pass the userToken as user_id
-        name: values.bookName,
-        description: values.description,
-        level: parseInt(values.level),
-        average_score: parseFloat(values.averageScore),
-        department_id: null, // You can modify this if needed
-      });
+      const response = await axios.post(
+        Config.BASE_URL + "/book/create",
+        {
+          user_id: userToken, // Pass the userToken as user_id
+          name: values.bookName,
+          description: values.description,
+          level: parseInt(values.level),
+          average_score: parseFloat(values.averageScore),
+          department_id: null, // You can modify this if needed
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       if (response.data.status === 1) {
         setSnackbarMessage("Attendance book created successfully");

@@ -2,22 +2,21 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, StyleSheet, StatusBar, Platform, Alert } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { PaperProvider } from "react-native-paper";
+import { Provider as PaperProvider, DefaultTheme } from "react-native-paper";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
-
 // Import custom components and modals
 import {
   NoInternetModal,
   LocationPermissionModal,
 } from "./components/InternetLocationModals";
-
+// Version Check Import
+import { VersionCheckModal, configureVersionCheck } from "./components/VersionModal";
 // Import screens
 import { Colors } from "./styles/styles";
-
 //Import Configs
 import { TickInContexts } from "./Contexts/TickInContexts";
 import OnboardingScreen from "./screens/Onboarding";
@@ -34,13 +33,15 @@ import EventDetailsScreen from "./screens/EventDetails";
 import ProfileEditScreen from "./screens/ProfileEdit";
 import CreateEventScreen from "./screens/CreateEvent";
 import SubscriptionsScreen from "./screens/SubscriptionsScreen";
+import EditProfileScreen from "./screens/EditProfile";
+// Notifications and Device Imports
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import axios from "axios";
 import Config from "./config/Config";
 const Stack = createNativeStackNavigator();
-
+// Configure Notification Handling
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -56,7 +57,7 @@ export default function App() {
   const notificationListener = useRef();
   const responseListener = useRef();
   const [notification, setNotification] = useState(false);
-
+  // Load Custom Fonts
   const [fontsLoaded, fontError] = useFonts({
     Quicksand: require("./assets/fonts/Quicksand-Regular.ttf"),
     "Quicksand-Bold": require("./assets/fonts/Quicksand-Bold.ttf"),
@@ -64,11 +65,26 @@ export default function App() {
     "Quicksand-SemiBold": require("./assets/fonts/Quicksand-SemiBold.ttf"),
     "Quicksand-Medium": require("./assets/fonts/Quicksand-Medium.ttf"),
   });
+  // Custom Theme Configuration
+  const theme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: Colors.primary,
+      accent: Colors.accent,
+      background: Colors.background,
+      surface: Colors.cardBackground,
+      text: Colors.textPrimary,
+      disabled: Colors.grey,
+      placeholder: Colors.textSecondary,
+      backdrop: Colors.almostBg,
+    },
+  };
+  // Push Notifications Setup
   useEffect(() => {
     registerForPushNotificationsAsync().then((token) =>
       setExpoPushToken(token)
     );
-
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
         setNotification(notification);
@@ -78,7 +94,8 @@ export default function App() {
       Notifications.addNotificationResponseReceivedListener((response) => {
         const url = response.notification.request.content.data.url;
         if (url) {
-          //nothing
+          // Handle notification tap (optional)
+          console.log("Notification URL:", url);
         }
       });
 
@@ -89,10 +106,10 @@ export default function App() {
       Notifications.removeNotificationSubscription(responseListener.current);
     };
   }, []);
-
+  // Register Push Notifications
   async function registerForPushNotificationsAsync() {
     let token;
-
+    // Android Notification Channel Setup
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
@@ -102,6 +119,7 @@ export default function App() {
       });
     }
 
+    // Check if running on a physical device
     if (Device.isDevice) {
       const { status: existingStatus } =
         await Notifications.getPermissionsAsync();
@@ -129,7 +147,11 @@ export default function App() {
             {
               token: token,
               userId: userToken,
-              pass: Config.PASS,
+             
+            }, {
+              headers: {
+                Authorization: `Bearer ${Config.PASS}`,
+              },
             }
           );
           console.log("Token posted successfully:", response.data);
@@ -143,18 +165,16 @@ export default function App() {
 
     return token;
   }
-  // Check internet connection
+  // Internet Connection Check
   useEffect(() => {
     const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected);
     });
-
     return () => {
       unsubscribeNetInfo();
     };
   }, []);
-
-  // Check location status
+  // Location Status Check
   useEffect(() => {
     const checkLocationStatus = async () => {
       try {
@@ -164,7 +184,6 @@ export default function App() {
           setLocationStatus("disabled");
           return;
         }
-
         // Check permission status
         let { status } = await Location.getForegroundPermissionsAsync();
 
@@ -188,19 +207,18 @@ export default function App() {
       clearInterval(locationInterval);
     };
   }, []);
-
+  // Layout Root View Callback
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
       await SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
-
+  // Initialize App and Determine Initial Route
   useEffect(() => {
     const initializeApp = async () => {
       try {
         // Check for userToken
         const userToken = await SecureStore.getItemAsync("userToken");
-
         // Set the initial route based on the existence of userToken
         setInitialRoute(userToken ? "BottomNav" : "Onboarding");
 
@@ -215,15 +233,14 @@ export default function App() {
 
     initializeApp();
   }, [fontsLoaded, fontError]);
-
+  // Prevent rendering if fonts are not loaded
   if (!fontsLoaded && !fontError) {
     return null;
   }
-
   return (
     <TickInContexts.Provider value={{}}>
       <View onLayout={onLayoutRootView} style={styles.container}>
-        <PaperProvider>
+        <PaperProvider theme={theme}>
           <NavigationContainer>
             <StatusBar
               barStyle="dark-content"
@@ -244,7 +261,6 @@ export default function App() {
                   component={BottomNav}
                   options={{ headerShown: false }}
                 />
-
                 <Stack.Screen
                   name="Onboarding"
                   component={OnboardingScreen}
@@ -305,19 +321,28 @@ export default function App() {
                   component={SubscriptionsScreen}
                   options={{ headerShown: false }}
                 />
+                <Stack.Screen
+                  name="EditProfile"
+                  component={EditProfileScreen}
+                  options={{ headerShown: false }}
+                />
               </Stack.Navigator>
             )}
           </NavigationContainer>
         </PaperProvider>
-
         {/* Internet and Location Modals */}
         <NoInternetModal />
         <LocationPermissionModal />
+
+        {/* Version Check Modal */}
+        <VersionCheckModal
+          apiUrl={Config.BASE_URL + "/resources/app-version"}
+          forceUpdateVersions={[]} // Versions that require mandatory updates
+        />
       </View>
     </TickInContexts.Provider>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

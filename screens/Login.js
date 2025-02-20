@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import { Formik } from "formik";
 import * as Yup from "yup";
@@ -48,29 +49,31 @@ const LoginScreen = ({}) => {
       }
     };
 
-    checkUserToken();
+    
   }, [navigation]);
   const handleLogin = async (values) => {
     setIsLoading(true);
     try {
       const response = await axios.post(Config.BASE_URL + "/auth/login", {
-        pass: Config.PASS,
         username: values.email,
         password: values.password,
         func: "login",
+      }, {
+        headers: {
+          Authorization: `Bearer ${Config.PASS}`,
+        },
       });
 
       // Check the response status
       if (response.data.status === "1") {
         // Store user token securely
         await SecureStore.setItemAsync("userToken", response.data.uid);
-        
+
         // Show success message
         Alert.alert("Success", "Login Successful");
 
         // Navigate to home page
         navigation.replace("BottomNav"); // Make sure you have a Home screen in your navigation
-        
       } else {
         // Show error message from backend
         Alert.alert("Login Failed", response.data.message);
@@ -85,11 +88,12 @@ const LoginScreen = ({}) => {
   };
 
   const handleForgotPassword = () => {
-    navigation.navigate("ForgotPassword");
+    // navigation.navigate("ForgotPassword");
+    Linking.openURL(`${Config.ROOT_URL}/forgot-password`);
   };
 
   const handleSignUp = () => {
-    navigation.navigate("SignUp");
+    navigation.navigate("Signup");
   };
 
   return (

@@ -19,7 +19,7 @@ import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { Colors } from "../styles/styles";
 import Config from "../config/Config";
 import { ChevronLeft } from "lucide-react-native";
@@ -150,7 +150,6 @@ const CreateEventScreen = () => {
         book_id: bookId,
         user_id: userToken,
         column_name: values.columnName,
-        admin_pass: Config.PASS, // Add the admin password here
         radius: values.radius,
         event_type: values.eventType,
         location_name: values.locationName || null,
@@ -160,15 +159,20 @@ const CreateEventScreen = () => {
         // Include location details based on location selection method
         ...(location
           ? {
-              longitude: location.longitude.toString(),
-              latitude: location.latitude.toString(),
-            }
+          longitude: location.longitude.toString(),
+          latitude: location.latitude.toString(),
+        }
           : {}),
       };
 
       const response = await axios.post(
         `${Config.BASE_URL}/book/create-column`,
-        payload
+        payload,
+        {
+          headers: {
+        Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
       );
       if (response.data.status === 1) {
         showSnackbar("Book column created successfully", "success");
@@ -396,6 +400,7 @@ const CreateEventScreen = () => {
       >
         <View style={styles.mapModalContainer}>
           <MapView
+            provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
               latitude: location?.latitude || 37.78825,

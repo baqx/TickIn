@@ -8,9 +8,11 @@ import {
   TextInput,
   Platform,
   Alert,
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Card, Button, Snackbar, Switch } from "react-native-paper";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { CheckCircle, MapPin, ReceiptText } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
@@ -20,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import Config from "../config/Config";
 import * as SecureStore from "expo-secure-store";
+
 const { width, height } = Dimensions.get("window");
 const { primary, white, textPrimary, textSecondary, success, background } =
   Colors;
@@ -37,7 +40,12 @@ const AttendScreen = ({ currentTab, userId }) => {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarVisible1, setSnackbarVisible1] = useState(false);
   const [snackbarMessage1, setSnackbarMessage1] = useState("");
- 
+
+  // New loading state variables
+  const [isLoadingEventDetails, setIsLoadingEventDetails] = useState(false);
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+
   const [longPressProgress, setLongPressProgress] = useState(0);
   const longPressTimerRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
@@ -45,20 +53,27 @@ const AttendScreen = ({ currentTab, userId }) => {
 
   const handleSubscriptionToggle = async () => {
     try {
+      setIsLoadingSubscription(true);
       const response = await axios.post(
         Config.BASE_URL + "/attendance/subscribe",
         {
-          pass: ADMIN_PASS,
           action: isEnabled ? "unsubscribe" : "subscribe",
           book_column_id: lectureDetails.book_column_id,
           user_id: await SecureStore.getItemAsync("userToken"),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
         }
       );
 
       if (response.data.status === 1) {
         setIsEnabled(!isEnabled); // Toggle the subscription status
         setSnackbarMessage1(
-          isEnabled ? "Unsubscribed successfully! You will no longer receive notifications from this attendance book" : "Subscribed successfully! We will notify you when a new attendance drops for this book"
+          isEnabled
+            ? "Unsubscribed successfully! You will no longer receive notifications from this attendance book"
+            : "Subscribed successfully! We will notify you when a new attendance drops for this book"
         );
         setSnackbarVisible1(true);
       } else {
@@ -70,9 +85,11 @@ const AttendScreen = ({ currentTab, userId }) => {
     } catch (error) {
       setSnackbarMessage("Error updating subscription");
       setSnackbarVisible(true);
+    } finally {
+      setIsLoadingSubscription(false);
     }
   };
- 
+
   useEffect(() => {
     // Request location permissions
     (async () => {
@@ -96,14 +113,20 @@ const AttendScreen = ({ currentTab, userId }) => {
   const toggleSubscription = () => {
     handleSubscriptionToggle(); // Call the subscription handler
   };
+
   const fetchEventDetails = async () => {
     try {
+      setIsLoadingEventDetails(true);
       const response = await axios.post(API_URL, {
-        pass: ADMIN_PASS,
+      
         action: "get_event_details",
         identifier_type: "shortcode",
         identifier: attendanceCode,
         user_id: await SecureStore.getItemAsync("userToken"),
+      }, {
+        headers: {
+          Authorization: `Bearer ${Config.PASS}`,
+        },
       });
 
       if (response.data.status === 1) {
@@ -128,7 +151,7 @@ const AttendScreen = ({ currentTab, userId }) => {
           },
           book_column_id: eventData.column_id,
         });
-        setIsEnabled(eventData.isSubscribed)
+        setIsEnabled(eventData.isSubscribed);
         setIsCodeSubmitted(true);
       } else {
         setSnackbarMessage(response.data.message || "Invalid attendance code");
@@ -137,6 +160,8 @@ const AttendScreen = ({ currentTab, userId }) => {
     } catch (error) {
       setSnackbarMessage("Error fetching event details");
       setSnackbarVisible(true);
+    } finally {
+      setIsLoadingEventDetails(false);
     }
   };
 
@@ -188,13 +213,18 @@ const AttendScreen = ({ currentTab, userId }) => {
     }
 
     try {
+      setIsLoadingAttendance(true);
       const response = await axios.post(API_URL, {
-        pass: ADMIN_PASS,
+       
         action: "mark_attendance",
         book_column_id: lectureDetails.book_column_id,
         user_id: await SecureStore.getItemAsync("userToken"),
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
+      }, {
+        headers: {
+          Authorization: `Bearer ${Config.PASS}`,
+        },
       });
 
       if (response.data.status === 1) {
@@ -208,6 +238,8 @@ const AttendScreen = ({ currentTab, userId }) => {
     } catch (error) {
       setSnackbarMessage("Error marking attendance");
       setSnackbarVisible(true);
+    } finally {
+      setIsLoadingAttendance(false);
     }
   };
 
@@ -220,7 +252,7 @@ const AttendScreen = ({ currentTab, userId }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       {/* Attendance Code Input */}
       {/* Render back button only if not coming from another tab */}
       {currentTab !== "mark-attendance" ? (
@@ -228,6 +260,7 @@ const AttendScreen = ({ currentTab, userId }) => {
           <Ionicons
             name="chevron-back-circle-outline"
             size={30}
+            color={Colors.textPrimary}
             style={{ marginHorizontal: 20, marginVertical: 20 }}
           />
         </TouchableOpacity>
@@ -245,12 +278,21 @@ const AttendScreen = ({ currentTab, userId }) => {
             maxLength={6}
             value={attendanceCode}
             onChangeText={setAttendanceCode}
+            editable={!isLoadingEventDetails}
           />
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[
+              styles.submitButton,
+              isLoadingEventDetails && styles.disabledButton,
+            ]}
             onPress={handleCodeSubmit}
+            disabled={isLoadingEventDetails}
           >
-            <Text style={styles.submitButtonText}>Submit Code</Text>
+            {isLoadingEventDetails ? (
+              <ActivityIndicator color={white} />
+            ) : (
+              <Text style={styles.submitButtonText}>Submit Code</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -259,17 +301,27 @@ const AttendScreen = ({ currentTab, userId }) => {
       {isCodeSubmitted && !isAttendanceMarked && lectureDetails && (
         <View style={styles.lectureDetailsContainer}>
           <Card style={styles.lectureCard}>
-            <TouchableOpacity onPress={toggleSubscription}>
-              <Ionicons
-                name={
-                  isEnabled ? "notifications-sharp" : "notifications-outline"
-                }
-                size={30}
-                style={{
-                  alignSelf: "flex-end",
-                }}
-                color={isEnabled ? Colors.primary : Colors.textSecondary}
-              />
+            <TouchableOpacity
+              onPress={toggleSubscription}
+              disabled={isLoadingSubscription}
+            >
+              {isLoadingSubscription ? (
+                <ActivityIndicator
+                  color={Colors.primary}
+                  style={{ alignSelf: "flex-end", padding: 10 }}
+                />
+              ) : (
+                <Ionicons
+                  name={
+                    isEnabled ? "notifications-sharp" : "notifications-outline"
+                  }
+                  size={30}
+                  style={{
+                    alignSelf: "flex-end",
+                  }}
+                  color={isEnabled ? Colors.primary : Colors.textSecondary}
+                />
+              )}
             </TouchableOpacity>
             <View style={styles.lectureCardContent}>
               <Text style={styles.lectureName}>
@@ -303,6 +355,7 @@ const AttendScreen = ({ currentTab, userId }) => {
 
               {/* Map View */}
               <MapView
+                provider={PROVIDER_GOOGLE}
                 style={styles.map}
                 initialRegion={{
                   latitude: lectureDetails.coordinates.latitude,
@@ -330,29 +383,37 @@ const AttendScreen = ({ currentTab, userId }) => {
                 borderColor: longPressProgress === 100 ? success : primary,
                 borderWidth: 3,
               },
+              isLoadingAttendance && styles.disabledButton,
             ]}
             onPressIn={startLongPress}
             onPressOut={stopLongPress}
+            disabled={isLoadingAttendance}
           >
-            <View
-              style={[
-                styles.longPressProgress,
-                {
-                  width: `${longPressProgress}%`,
-                  backgroundColor: primary, // Change progress color
-                },
-              ]}
-            />
-            <Text
-              style={[
-                styles.longPressButtonText,
-                {
-                  color: longPressProgress === 100 ? success : textPrimary,
-                },
-              ]}
-            >
-              Long Press to Mark Attendance
-            </Text>
+            {isLoadingAttendance ? (
+              <ActivityIndicator color={textPrimary} />
+            ) : (
+              <>
+                <View
+                  style={[
+                    styles.longPressProgress,
+                    {
+                      width: `${longPressProgress}%`,
+                      backgroundColor: primary, // Change progress color
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.longPressButtonText,
+                    {
+                      color: longPressProgress === 100 ? success : textPrimary,
+                    },
+                  ]}
+                >
+                  Long Press to Mark Attendance
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -387,7 +448,7 @@ const AttendScreen = ({ currentTab, userId }) => {
         duration={3000}
         style={styles.snackbar1}
       >
-          {snackbarMessage1}
+        {snackbarMessage1}
       </Snackbar>
       <Snackbar
         visible={snackbarVisible}
@@ -397,18 +458,19 @@ const AttendScreen = ({ currentTab, userId }) => {
       >
         {snackbarMessage}
       </Snackbar>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: background,
+    backgroundColor: Colors.background,
     padding: 15,
-    justifyContent: "center",
   },
   codeInputContainer: {
+    justifyContent: "center",
+    marginTop: height * 0.3,
     alignItems: "center",
   },
   title: {
@@ -454,6 +516,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 20,
     borderRadius: 15,
+    backgroundColor: Colors.cardBackground,
   },
   lectureCardContent: {
     alignItems: "center",
@@ -493,7 +556,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
     marginTop: 20,
-    backgroundColor: white, // Background color of the button
+    backgroundColor: Colors.cardBackground, // Background color of the button
     borderWidth: 3, // Optional: add a border for more definition
     borderColor: textSecondary, // Border color when not activated
   },
@@ -513,6 +576,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
+    marginTop: height * 0.3,
   },
   attendanceMarkedText: {
     fontFamily: "Quicksand-Bold",

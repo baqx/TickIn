@@ -17,7 +17,7 @@ import {
   DataTable,
   ActivityIndicator,
 } from "react-native-paper";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import {
   Edit,
   Trash2,
@@ -71,11 +71,18 @@ const EventDetailsScreen = () => {
   // Fetch Event Details
   const fetchEventDetails = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/book/column-details`, {
-        pass: ADMIN_PASS,
-        user_id: await SecureStore.getItemAsync("userToken"),
-        book_column_id: bookColumnId,
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/book/column-details`,
+        {
+          user_id: await SecureStore.getItemAsync("userToken"),
+          book_column_id: bookColumnId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       if (response.data.status === 1) {
         setEventDetails(response.data.columnDetails);
@@ -96,8 +103,12 @@ const EventDetailsScreen = () => {
       const response = await axios.post(
         `${API_BASE_URL}/book/attendance-list`,
         {
-          pass: ADMIN_PASS,
           book_column_id: bookColumnId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
         }
       );
 
@@ -157,13 +168,13 @@ const EventDetailsScreen = () => {
               const response = await axios.post(
                 `${Config.BASE_URL}/book/delete-column`,
                 {
-                  pass: Config.PASS,
                   user_id: userToken,
                   book_column_id: bookColumnId,
                 },
                 {
                   headers: {
                     "Content-Type": "application/json",
+                    Authorization: `Bearer ${Config.PASS}`,
                   },
                 }
               );
@@ -367,6 +378,7 @@ const EventDetailsScreen = () => {
       {/* Location Map */}
       <Card style={styles.mapCard}>
         <MapView
+          provider={PROVIDER_GOOGLE}
           style={styles.map}
           initialRegion={{
             latitude: parseFloat(eventDetails.latitude),
@@ -415,32 +427,38 @@ const EventDetailsScreen = () => {
       </View>
 
       {/* Attendance List */}
-      <Card style={styles.attendanceCard}>
-        <DataTable>
-          <DataTable.Header>
-            <DataTable.Title>Name</DataTable.Title>
-            <DataTable.Title>Matric No</DataTable.Title>
-            <DataTable.Title>Time Marked</DataTable.Title>
-          </DataTable.Header>
+      <DataTable style={styles.attendanceCard}>
+        <DataTable.Header style={styles.dataTableHeader}>
+          <DataTable.Title style={styles.dataTableTitle}>Name</DataTable.Title>
+          <DataTable.Title style={styles.dataTableTitle}>
+            Matric No
+          </DataTable.Title>
+          <DataTable.Title style={styles.dataTableTitle}>
+            Time Marked
+          </DataTable.Title>
+        </DataTable.Header>
 
-          {attendanceList.slice(from, to).map((student, index) => (
-            <DataTable.Row key={index}>
-              <DataTable.Cell>{student.user_name}</DataTable.Cell>
-              <DataTable.Cell>{student.matric_number}</DataTable.Cell>
-              <DataTable.Cell>
-                {moment(student.attendance_date).format("h:mm A, MMM D")}
-              </DataTable.Cell>
-            </DataTable.Row>
-          ))}
+        {attendanceList.slice(from, to).map((student, index) => (
+          <DataTable.Row key={index} style={styles.dataTableRow}>
+            <DataTable.Cell style={styles.dataTableCell}>
+              {student.user_name}
+            </DataTable.Cell>
+            <DataTable.Cell style={styles.dataTableCell}>
+              {student.matric_number}
+            </DataTable.Cell>
+            <DataTable.Cell style={styles.dataTableCell}>
+              {moment(student.attendance_date).format("h:mm A, MMM D")}
+            </DataTable.Cell>
+          </DataTable.Row>
+        ))}
 
-          <DataTable.Pagination
-            page={page}
-            numberOfPages={Math.ceil(attendanceList.length / itemsPerPage)}
-            onPageChange={(page) => setPage(page)}
-            label={`${from + 1}-${to} of ${attendanceList.length}`}
-          />
-        </DataTable>
-      </Card>
+        <DataTable.Pagination
+          page={page}
+          numberOfPages={Math.ceil(attendanceList.length / itemsPerPage)}
+          onPageChange={(page) => setPage(page)}
+          label={`${from + 1}-${to} of ${attendanceList.length}`}
+        />
+      </DataTable>
     </ScrollView>
   );
 };
@@ -456,6 +474,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 15,
+    backgroundColor: background,
   },
   headerTextContainer: {
     flex: 1,
@@ -529,9 +548,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 10,
     overflow: "hidden",
+    backgroundColor: Colors.cardBackground,
   },
   map: {
-    height: 250,
+    height: 300,
     width: "100%",
   },
   mapActions: {
@@ -551,15 +571,36 @@ const styles = StyleSheet.create({
   attendanceCard: {
     marginBottom: 15,
     borderRadius: 10,
+    color: Colors.cardBackground,
   },
   loadMoreContainer: {
     alignItems: "center",
     padding: 10,
     justifyContent: "center",
+    backgroundColor: Colors.background,
+    flex: 1,
   },
   loadMoreText: {
     fontFamily: "Quicksand-Medium",
     color: textSecondary,
+  },
+
+  //data table
+  dataTableHeader: {
+    backgroundColor: Colors.primary, // Header background color
+  },
+  dataTableTitle: {
+    color: Colors.white, // Header text color
+    fontFamily: "Quicksand-Bold", // Font style for header
+  },
+  dataTableRow: {
+    backgroundColor: Colors.cardBackground, // Row background color
+  },
+  dataTableCell: {
+    paddingVertical: 10, // Vertical padding for cells
+    paddingHorizontal: 5, // Horizontal padding for cells
+    borderBottomWidth: 1, // Add border to separate rows
+    borderBottomColor: Colors.textSecondary, // Border color
   },
 });
 

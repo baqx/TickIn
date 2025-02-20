@@ -57,12 +57,19 @@ const AttendanceHistoryScreen = ({ navigation }) => {
 
       const requestPage = isRefresh ? 1 : page;
 
-      const response = await axios.post(API_URL, {
-        pass: ADMIN_PASS,
-        user_id: userToken,
-        page: requestPage,
-        limit: 10, // Adjust as needed
-      });
+      const response = await axios.post(
+        API_URL,
+        {
+          user_id: userToken,
+          page: requestPage,
+          limit: 10, // Adjust as needed
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       if (response.data.status === 1) {
         // If refreshing, reset the records
@@ -132,7 +139,13 @@ const AttendanceHistoryScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <Text style={styles.title}>Attendance History</Text>
-
+      {loading && (
+        <ActivityIndicator
+          size="large"
+          color={white}
+          style={styles.loadingIndicator}
+        />
+      )}
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -195,7 +208,7 @@ const styles = StyleSheet.create({
   recordCard: {
     marginBottom: 15,
     borderRadius: 10,
-    backgroundColor: white,
+    backgroundColor: Colors.cardBackground,
     padding: 15,
     elevation: 3, // Adding shadow for better aesthetics
   },

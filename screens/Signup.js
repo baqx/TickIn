@@ -15,6 +15,7 @@ import Config from "../config/Config";
 import { Colors } from "../styles/styles";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { ActivityIndicator } from "react-native-paper";
 
 // Configuration and API endpoints
 const API_BASE_URL = Config.BASE_URL;
@@ -39,6 +40,8 @@ const SignupScreen = ({}) => {
   const [matricNo, setMatricNo] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false); // New loading state
+
   useEffect(() => {
     const checkUserToken = async () => {
       try {
@@ -213,24 +216,32 @@ const SignupScreen = ({}) => {
   // Handle signup submission
   const handleSignup = async () => {
     if (!validateForm()) return;
-
+    setLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/signup`, {
-        pass: ADMIN_PASS,
-        func: "signup",
-        username,
-        email,
-        phone,
-        fullname,
-        gender,
-        university: universities.find((u) => u.id === university)?.id || "",
-        faculty: faculties.find((f) => f.id === faculty)?.id || "",
-        department: departments.find((d) => d.id === department)?.id || "",
-        role,
-        level,
-        matric_no: matricNo,
-        password,
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/auth/signup`,
+        {
+         
+          func: "signup",
+          username,
+          email,
+          phone,
+          fullname,
+          gender,
+          university: universities.find((u) => u.id === university)?.id || "",
+          faculty: faculties.find((f) => f.id === faculty)?.id || "",
+          department: departments.find((d) => d.id === department)?.id || "",
+          role,
+          level,
+          matric_no: matricNo,
+          password,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       // Check API response
       if (response.data.status === "1") {
@@ -252,6 +263,8 @@ const SignupScreen = ({}) => {
         "Signup Error",
         error.response?.data?.message || "An unexpected error occurred"
       );
+    } finally {
+      setLoading(false); // Set loading to false when signup ends
     }
   };
 
@@ -391,7 +404,11 @@ const SignupScreen = ({}) => {
       />
       {/* Signup Button */}
       <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-        <Text style={styles.signupButtonText}>Sign Up</Text>
+        {loading ? (
+          <ActivityIndicator size="small" color="#ffffff" /> // Show activity indicator when loading
+        ) : (
+          <Text style={styles.signupButtonText}>Sign Up</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );

@@ -51,11 +51,15 @@ const SubscriptionsScreen = () => {
         const response = await axios.post(
           `${Config.BASE_URL}/user/subscriptions`,
           {
-            pass: Config.PASS,
             user_id: userToken,
             page: pageNum,
             per_page: 10,
             action: "list_subscriptions",
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${Config.PASS}`,
+            },
           }
         );
         console.log(response);
@@ -109,9 +113,13 @@ const SubscriptionsScreen = () => {
       const response = await axios.post(
         `${Config.BASE_URL}/user/subscriptions`,
         {
-          pass: Config.PASS,
           action: "delete_subscription",
           subscription_id: subscriptionId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
         }
       );
 
@@ -165,11 +173,10 @@ const SubscriptionsScreen = () => {
   // Pagination loader
   const loadMoreSubscriptions = useCallback(() => {
     // Check if we can load more pages and are not already loading
-    if (page < totalPages && !loading) {
+    if (page < totalPages && !loading && subscriptions.length > 0) {
       fetchSubscriptions(page + 1);
     }
-  }, [fetchSubscriptions, page, totalPages, loading]);
-
+  }, [fetchSubscriptions, page, totalPages, loading, subscriptions.length]);
   useEffect(() => {
     const loadInitialData = async () => {
       await fetchSubscriptions(1);
@@ -241,7 +248,8 @@ const SubscriptionsScreen = () => {
             <Book size={64} color={Colors.textSecondary} />
             <Text style={styles.emptyTitle}>No Subscriptions</Text>
             <Text style={styles.emptySubtitle}>
-              You haven't subscribed to any attendance book yet. Start exploring!
+              You haven't subscribed to any attendance book yet. Start
+              exploring!
             </Text>
           </View>
         )}
@@ -265,7 +273,7 @@ const SubscriptionsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.background,
   },
   headerContainer: {
     flexDirection: "row",
@@ -290,7 +298,7 @@ const styles = StyleSheet.create({
   subscriptionItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: Colors.cardBackground,
     marginBottom: 10,
     padding: 15,
     borderRadius: 10,
@@ -310,10 +318,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Quicksand-SemiBold",
     marginBottom: 5,
+    color: Colors.textPrimary,
   },
   subscriptionDate: {
     fontSize: 14,
-    color: "#666",
+    color: Colors.textSecondary,
     fontFamily: "Quicksand",
   },
   deleteButton: {

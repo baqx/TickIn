@@ -100,7 +100,7 @@ export const LocationPermissionModal = () => {
           distanceInterval: 10, // Or every 10 meters
         },
         (location) => {
-          console.log(location);
+         // console.log(location);
           // Handle location updates here if needed
         }
       );

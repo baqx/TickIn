@@ -65,10 +65,14 @@ const NotificationsScreen = ({}) => {
         const response = await axios.post(
           `${Config.BASE_URL}/user/notifications`,
           {
-            pass: Config.PASS, // Replace with actual admin pass
             user_id: userToken,
             page: pageNum,
             per_page: 10,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${Config.PASS}`,
+            },
           }
         );
 
@@ -124,10 +128,17 @@ const NotificationsScreen = ({}) => {
       const userToken = await fetchUserToken();
       if (!userToken) return;
 
-      const response = await axios.post(`${Config.BASE_URL}/user/mark-read`, {
-        pass: Config.PASS,
-        user_id: userToken,
-      });
+      const response = await axios.post(
+        `${Config.BASE_URL}/user/mark-read`,
+        {
+          user_id: userToken,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
 
       if (response.data.status === 1) {
         setNotifications((prev) =>
@@ -254,26 +265,26 @@ const NotificationsScreen = ({}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.background,
   },
   headerContainer: {
     paddingHorizontal: 15,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   headerTitle: {
     fontSize: 22,
     fontFamily: "Quicksand-Bold",
+    color: Colors.textPrimary,
   },
   listContent: {
     paddingHorizontal: 15,
     paddingTop: 10,
+    backgroundColor: Colors.background,
   },
   notificationItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+
     marginBottom: 10,
     padding: 15,
     borderRadius: 10,
@@ -282,9 +293,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    backgroundColor: Colors.almostBg,
   },
   readNotification: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.cardBackground,
   },
   notificationIconContainer: {
     marginRight: 15,
@@ -304,34 +316,37 @@ const styles = StyleSheet.create({
   },
   notificationTitle: {
     fontSize: 16,
-    fontFamily: "Quicksand-SemiBold",
+    fontFamily: "Quicksand-Bold",
     marginBottom: 5,
+    color: Colors.textPrimary,
   },
   notificationDescription: {
     fontSize: 14,
-    color: "#666",
+    color: Colors.textSecondary,
     marginBottom: 5,
     fontFamily: "Quicksand",
   },
   readText: {
-    color: "#999",
+    color: Colors.textPrimary,
+    fontFamily: "Quicksand-SemiBold",
   },
   notificationTimestamp: {
     fontSize: 12,
-    color: "#999",
+    color: Colors.textSecondary,
   },
   loadingFooter: {
     paddingVertical: 20,
     alignItems: "center",
   },
   loadingText: {
-    color: "#666",
+    color: Colors.textPrimary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 50,
+    backgroundColor: Colors.background,
   },
   emptyTitle: {
     fontSize: 18,
