@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
+  FlatList,
+  ImageBackground,
 } from "react-native";
 import { Avatar, Card, Button, Surface, Chip } from "react-native-paper";
 import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
@@ -28,7 +30,7 @@ import * as Application from "expo-application";
 import { Colors } from "../styles/styles";
 import Config from "../config/Config";
 import { useNavigation } from "@react-navigation/native";
-
+const { width: windowWidth } = Dimensions.get("window");
 // Color Palette
 const {
   mainThemeColor,
@@ -40,7 +42,40 @@ const {
   accent,
   success,
 } = Colors;
+// Memoized Ad Item Component
+const AdItem = React.memo(({ item }) => (
+  <TouchableOpacity onPress={() => Linking.openURL(item.url)}>
+    <View style={styles.slide}>
+      <Card style={styles.adCard}>
+        <ImageBackground
+          source={{ uri: item.image }}
+          style={styles.adBackground}
+          imageStyle={styles.adBackgroundImage}
+        >
+          <View style={styles.adChip}>
+            <Text style={{ color: "white" }}>AD</Text>
+          </View>
+          <View style={styles.adContent}>
+            <Text style={styles.adTitle}>{item.title}</Text>
+            <Text style={styles.adSubtitle}>{item.subtitle}</Text>
+          </View>
+        </ImageBackground>
+      </Card>
+    </View>
+  </TouchableOpacity>
+));
 
+// Memoized Pagination Component
+const Pagination = React.memo(({ data, currentIndex }) => (
+  <View style={styles.pagination}>
+    {data.map((_, index) => (
+      <View
+        key={index}
+        style={[styles.dot, currentIndex === index && styles.activeDot]}
+      />
+    ))}
+  </View>
+));
 const HomeScreen = ({}) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userProfile, setUserProfile] = useState(null);
@@ -48,6 +83,42 @@ const HomeScreen = ({}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigation = useNavigation();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef(null);
+  const [adsData, setAdsData] = useState([]); // New state for ads data
+
+  // Modified fetchAdsData function
+  const fetchAdsData = async () => {
+    try {
+      const response = await axios.post(
+        Config.BASE_URL + "/user/adverts",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${Config.PASS}`,
+          },
+        }
+      );
+
+      if (response.data.status === 1 && response.data.adverts) {
+        const ads = response.data.adverts.map((ad) => ({
+          id: ad.id,
+          title: ad.title,
+          subtitle: ad.description,
+          image: ad.image_url,
+          url: ad.url,
+        }));
+        setAdsData(ads);
+      } else {
+        // If no ads, set empty array without throwing error
+        setAdsData([]);
+      }
+    } catch (err) {
+      console.error("Ads fetch error:", err);
+      setAdsData([]); // Set empty array on error
+    }
+  };
+
   // Fetch user profile
 
   const fetchUserProfile = async () => {
@@ -117,21 +188,43 @@ const HomeScreen = ({}) => {
       setLoading(false);
     }
   };
-
-  // Time update effect
   useEffect(() => {
-    // Fetch user profile on component mount
     fetchUserProfile();
+    fetchAdsData(); // Call fetchAdsData in useEffect
 
-    // Update time every second
-    const timer = setInterval(() => {
+    const timeInterval = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
+    // Only set up scroll interval if there are ads
+    let scrollInterval;
+    if (adsData.length > 0) {
+      scrollInterval = setInterval(() => {
+        if (flatListRef.current) {
+          const nextIndex = (currentIndex + 1) % adsData.length;
+          flatListRef.current.scrollToIndex({
+            index: nextIndex,
+            animated: true,
+          });
+          setCurrentIndex(nextIndex);
+        }
+      }, 3000);
+    }
+
     return () => {
-      clearInterval(timer);
+      clearInterval(timeInterval);
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
     };
-  }, []);
+  }, [currentIndex, adsData.length]);
+  // Handle scroll end
+  const handleScrollEnd = (e) => {
+    const newIndex = Math.round(
+      e.nativeEvent.contentOffset.x / (windowWidth - 32)
+    );
+    setCurrentIndex(newIndex);
+  };
 
   // Quick Action Button Component
   const QuickActionButton = ({ icon, title, onPress }) => (
@@ -217,7 +310,7 @@ const HomeScreen = ({}) => {
       <Card style={styles.userDetailsCard}>
         <View style={styles.userDetailsContainer}>
           <View style={styles.userDetailItem}>
-            <MaterialIcons name="school" size={24} color={primary} />
+            <Ionicons name="school" size={24} color={primary} />
             <Text style={styles.userDetailText}>{userProfile.university}</Text>
           </View>
           <View style={styles.userDetailItem}>
@@ -327,35 +420,27 @@ const HomeScreen = ({}) => {
         </View>
       </Card>
       */}
-      <Card style={styles.adsCard}>
-        <View style={styles.adsContent}>
-          <Text style={styles.adsTitle}>
-            Thanks for using our beta version{" "}
-            {Application.nativeApplicationVersion} !
-          </Text>
-          <Text style={styles.adsSubtitle}>
-            We are still working on making the app better at this time,kindly
-            contact us if any bug arise
-          </Text>
-          <Button
-            mode="outlined"
-            onPress={() => {
-              const phoneNumber = "+2349019659410";
-              const message = "Hello! I am a user of the TickIn beta app."; // You can customize the message if needed
-              const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-                message
-              )}`;
-              Linking.openURL(url).catch((err) =>
-                console.error("Error opening WhatsApp:", err)
-              );
-            }}
-            style={styles.adsButton}
-            labelStyle={{ fontFamily: "Quicksand" }}
-          >
-            Get In touch
-          </Button>
+      {adsData.length > 0 && (
+        <View style={styles.carouselContainer}>
+          <FlatList
+            ref={flatListRef}
+            data={adsData}
+            renderItem={({ item }) => <AdItem item={item} />}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScrollEnd}
+            snapToInterval={windowWidth - 32}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            contentContainerStyle={styles.flatListContent}
+          />
+          <Pagination data={adsData} currentIndex={currentIndex} />
         </View>
-      </Card>
+      )}
+
+      <View style={{ height: 30 }}></View>
     </ScrollView>
   );
 };
@@ -554,27 +639,67 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: textPrimary,
   },
-  adsCard: {
-    marginBottom: 15,
-    borderRadius: 10,
-    backgroundColor: primaryLight,
-  },
-  adsContent: {
-    padding: 20,
-    alignItems: "center",
-  },
-  adsTitle: {
-    fontFamily: "Quicksand-Bold",
-    fontSize: 20,
-    color: white,
-  },
-  adsSubtitle: {
-    fontFamily: "Quicksand-Medium",
-    color: white,
+  carouselContainer: {
     marginVertical: 10,
   },
-  adsButton: {
-    backgroundColor: white,
+  flatListContent: {
+    paddingHorizontal: 16,
+  },
+  slide: {
+    width: windowWidth - 32,
+  },
+  adCard: {
+    height: 180,
+    overflow: "hidden",
+  },
+  adBackground: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "flex-end",
+  },
+  adBackgroundImage: {
+    resizeMode: "cover",
+  },
+  adContent: {
+    padding: 15,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  adTitle: {
+    color: white,
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  adSubtitle: {
+    color: white,
+    fontSize: 16,
+  },
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#ccc",
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: primary,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  adChip: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    backgroundColor: primary,
+    color: white,
+    padding:3,
+    borderRadius: 5,
   },
 });
 

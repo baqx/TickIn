@@ -169,8 +169,14 @@ const AttendanceBookDetailScreen = () => {
         const fileContents = response.data.file;
         const fileName = response.data.filename;
 
+        // Get the Downloads directory
+        const downloadsDir = FileSystem.documentDirectory + "Download/";
+
+        // Ensure the Downloads directory exists
+        await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+
         // Create file URI using Expo FileSystem
-        const fileUri = FileSystem.documentDirectory + fileName;
+        const fileUri = downloadsDir + fileName;
 
         // Write file contents to local storage
         await FileSystem.writeAsStringAsync(fileUri, fileContents, {

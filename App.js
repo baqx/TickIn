@@ -8,6 +8,7 @@ import { useFonts } from "expo-font";
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
+import * as Linking from 'expo-linking';
 // Import custom components and modals
 import {
   NoInternetModal,
@@ -57,6 +58,17 @@ export default function App() {
   const notificationListener = useRef();
   const responseListener = useRef();
   const [notification, setNotification] = useState(false);
+
+  const linking = {
+    prefixes: ['TickIn://', 'https://tickin.name.ng'],
+    config: {
+      screens: {
+        HomeScreen: 'home',
+        ProfileEditScreen: 'profile/:id', // reapvest://profile/123
+   
+      },
+    },
+  };
   // Load Custom Fonts
   const [fontsLoaded, fontError] = useFonts({
     Quicksand: require("./assets/fonts/Quicksand-Regular.ttf"),
@@ -241,7 +253,7 @@ export default function App() {
     <TickInContexts.Provider value={{}}>
       <View onLayout={onLayoutRootView} style={styles.container}>
         <PaperProvider theme={theme}>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <StatusBar
               barStyle="dark-content"
               backgroundColor={Colors.background}

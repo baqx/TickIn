@@ -2,14 +2,15 @@
   "expo": {
     "name": "TickIn",
     "slug": "TickIn",
-    "version": "1.1.0",
+    "scheme": "TickIn",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
     "ios": {
@@ -22,6 +23,7 @@
       }
     },
     "android": {
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -32,7 +34,20 @@
         "googleMaps": {
           "apiKey": "AIzaSyAF28Bb4qZ23hXLE8rcCZx6FNY1YKNsOFM"
         }
-      }
+      },
+
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "tickin.name.ng"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
